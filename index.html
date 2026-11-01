@@ -109,7 +109,7 @@
     <!-- 3-State Verdict Card -->
     <div id="resultBox" class="hidden skeuo-card w-full max-w-md p-6 rounded-3xl text-center transition-all duration-300">
       <div class="flex items-center justify-between mb-2">
-        <span id="engineBadge" class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">DeBERTa NLI</span>
+        <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Verification Verdict</span>
         <span id="confidenceBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200"></span>
       </div>
       
@@ -155,7 +155,6 @@
       const resultBox = document.getElementById('resultBox');
       const verdictText = document.getElementById('verdictText');
       const confidenceBadge = document.getElementById('confidenceBadge');
-      const engineBadge = document.getElementById('engineBadge');
       const classificationText = document.getElementById('classificationText');
       const evidenceContainer = document.getElementById('evidenceContainer');
       const evidenceText = document.getElementById('evidenceText');
@@ -192,7 +191,6 @@
           verdictText.className = "text-xl sm:text-2xl font-bold text-amber-600 tracking-normal py-2";
           confidenceBadge.textContent = "Invalid Query";
           confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
-          engineBadge.textContent = "Input Sanity Guard";
           classificationText.textContent = "Conversational prompt or non-assertion query detected.";
           resultBox.classList.remove('hidden');
           return;
@@ -207,7 +205,6 @@
 
         let verdict = "UNVERIFIED";
         let classification = "";
-        let engineName = "DeBERTa NLI";
         let confidenceScore = null;
         let evidenceSnippet = "";
         let counterHi = "";
@@ -240,7 +237,6 @@
             }
             verdict = data.verdict || "UNVERIFIED";
             classification = data.classification || "";
-            engineName = data.engine || "DeBERTa NLI Cross-Encoder";
             confidenceScore = data.confidence || null;
             evidenceSnippet = data.ground_truth ? `${data.ground_truth.source}: "${data.ground_truth.text}"` : "";
             counterHi = data.counter_hi || "";
@@ -252,7 +248,6 @@
 
         // 2. Client-side Real-time Web Evidence Fallback (Degraded Mode)
         if (!backendOk) {
-          engineName = "Client Web Fallback (Degraded)";
           const qLower = normalizedQuery.toLowerCase();
           const qWords = qLower.split(/\s+/).filter(w => w.length > 2);
 
@@ -373,7 +368,6 @@
           confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
         }
 
-        engineBadge.textContent = engineName;
         classificationText.textContent = classification;
 
         if (evidenceSnippet) {
@@ -393,7 +387,6 @@
         verdictText.className = "text-2xl sm:text-3xl font-bold text-slate-700 tracking-normal py-1";
         confidenceBadge.textContent = "Execution Error";
         confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200";
-        engineBadge.textContent = "Execution Guard";
         classificationText.textContent = "Temporary execution error occurred while scanning dispatches.";
         evidenceContainer.classList.add('hidden');
         hindiContainer.classList.add('hidden');
