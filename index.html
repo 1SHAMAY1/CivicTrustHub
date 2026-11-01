@@ -182,23 +182,35 @@
         let confidenceScore = 0.85;
         let evidenceSnippet = '';
 
-        // 1. Try local FastAPI backend if running
+        // 1. Try local FastAPI backend ONLY if running on localhost / 127.0.0.1
+        // (Prevents browser Private Network Access security prompts on GitHub Pages)
         let backendOk = false;
-        try {
-          const res = await fetch('http://127.0.0.1:8000/api/rumors/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: input })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            isTrue = !data.is_unverified;
-            confidenceScore = data.cosine_similarity || 0.85;
-            evidenceSnippet = data.ground_truth ? `${data.ground_truth.source}: "${data.ground_truth.text}"` : '';
-            backendOk = true;
+        const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+        if (isLocalDev) {
+          try {
+            const res = await fetch('http://127.0.0.1:8000/api/rumors/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: input })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.is_invalid) {
+                verdictText.textContent = data.message || "Please check rumors only.";
+                verdictText.className = "text-xl sm:text-2xl font-bold text-amber-600 tracking-normal py-2";
+                confidenceBadge.textContent = "Invalid Query";
+                confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
+                resultBox.classList.remove('hidden');
+                return;
+              }
+              isTrue = !data.is_unverified;
+              confidenceScore = data.cosine_similarity || 0.85;
+              evidenceSnippet = data.ground_truth ? `${data.ground_truth.source}: "${data.ground_truth.text}"` : '';
+              backendOk = true;
+            }
+          } catch (err) {
+            backendOk = false;
           }
-        } catch (err) {
-          backendOk = false;
         }
 
         // 2. Client-side real-time evidence fallback (Works on GitHub Pages)

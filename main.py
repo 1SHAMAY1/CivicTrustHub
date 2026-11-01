@@ -139,11 +139,40 @@ def compute_semantic_similarity(query: str, candidate_texts: List[str]) -> List[
 # Real-Time Fact Verification & Regional Card Synthesizer
 # ----------------------------------------------------------------
 def verify_claim_against_web(claim_text: str) -> dict:
+    # 0. Edge-case sanitization & non-rumor filtering
+    clean_raw = re.sub(r'[^a-zA-Z0-9\s]', ' ', claim_text).lower().strip()
+    raw_words = [w for w in clean_raw.split() if w]
+    common_greetings = {
+        'hi', 'hello', 'hey', 'test', 'testing', 'how are you', 'who are you',
+        'good morning', 'good afternoon', 'good evening', 'bye', 'ok', 'okay', 'yes', 'no'
+    }
+
+    is_greeting = clean_raw in common_greetings
+    is_too_short = len(raw_words) < 2 or len(clean_raw) < 5
+    is_numbers_only = clean_raw.isdigit()
+
+    if is_greeting or is_too_short or is_numbers_only:
+        return {
+            "is_invalid": True,
+            "classification": "INVALID QUERY",
+            "message": "Please check rumors only.",
+            "cosine_similarity": 0.0,
+            "is_unverified": True,
+            "panic_index": 0,
+            "ground_truth": {
+                "source": "Input Sanity Filter",
+                "text": "Query does not contain an assertive claim or rumor to corroborate."
+            },
+            "counter_en": "Please enter an assertive claim or rumor to check (e.g., 'Schools closed tomorrow in Delhi due to flood').",
+            "counter_hi": "कृपया जांच के लिए कोई विशिष्ट दावा या अफवाह दर्ज करें।"
+        }
+
     evidence_list = fetch_live_web_evidence(claim_text, max_results=8)
 
     if not evidence_list:
         # No credible records found anywhere on the internet
         return {
+            "is_invalid": False,
             "classification": "UNVERIFIED RUMOR – Zero Credible News Confirmation",
             "cosine_similarity": 0.18,
             "panic_index": 88,
@@ -181,6 +210,7 @@ def verify_claim_against_web(claim_text: str) -> dict:
         counter_hi = f"अपुष्ट दावा: {best_match['source']} की मौजूदा रिपोर्ट: \"{best_match['text']}\"। वायरल दावे की आधिकारिक पुष्टि नहीं है।"
 
     return {
+        "is_invalid": False,
         "classification": classification,
         "cosine_similarity": best_sim,
         "panic_index": panic_index,
