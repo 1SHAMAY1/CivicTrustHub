@@ -7,93 +7,125 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      /* Clean white center fading outwards into a sleek dark/black vignette border */
-      background: radial-gradient(circle at 50% 30%, #ffffff 0%, #f1f5f9 35%, #94a3b8 70%, #1e293b 88%, #090d16 100%);
+      /* Modern luxury dark studio gradient (subtle charcoal slate to deep black) */
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, #1e293b 0%, #0f172a 50%, #030712 100%);
       min-height: 100vh;
-      color: #0f172a;
+      color: #f8fafc;
+      overflow-x: hidden;
     }
 
-    /* Tactile container with clean white core and dark ambient gradient depth */
-    .skeuo-search-container {
-      background: linear-gradient(145deg, #ffffff, #edf2f7);
+    /* Subtle ambient top glow */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px;
+      height: 350px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, rgba(16, 185, 129, 0.08) 40%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glassmorphic frosted luxury search bar */
+    .premium-search-container {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       box-shadow: 
-        0 20px 40px -15px rgba(0, 0, 0, 0.45),
-        0 10px 20px -10px rgba(15, 23, 42, 0.25),
-        inset 1px 1px 2px rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(226, 232, 240, 0.8);
+        0 20px 40px -15px rgba(0, 0, 0, 0.7),
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        inset 0 1px 1px rgba(255, 255, 255, 0.15);
+      transition: all 0.25s ease;
     }
 
-    .skeuo-input {
+    .premium-search-container:focus-within {
+      border-color: rgba(34, 197, 94, 0.45);
       box-shadow: 
-        inset 2px 2px 5px rgba(15, 23, 42, 0.12),
-        inset -2px -2px 5px rgba(255, 255, 255, 0.9);
-      background: #f8fafc;
-      color: #0f172a;
+        0 25px 50px -12px rgba(0, 0, 0, 0.8),
+        0 0 24px rgba(34, 197, 94, 0.2),
+        inset 0 1px 1px rgba(255, 255, 255, 0.2);
     }
 
-    .skeuo-input::placeholder {
-      color: #64748b;
+    .premium-input {
+      background: transparent;
+      color: #f8fafc;
     }
 
-    .skeuo-send-btn {
-      background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+    .premium-input::placeholder {
+      color: #94a3b8;
+    }
+
+    /* Polished green action button */
+    .premium-send-btn {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
       box-shadow: 
-        3px 4px 10px rgba(21, 128, 61, 0.4),
-        -1px -1px 4px rgba(255, 255, 255, 0.8),
+        0 4px 14px rgba(16, 185, 129, 0.35),
         inset 0 1px 1px rgba(255, 255, 255, 0.4);
-      transition: all 0.15s ease-in-out;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .skeuo-send-btn:hover {
-      background: linear-gradient(135deg, #25d366 0%, #16a34a 100%);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(34, 197, 94, 0.45);
+    .premium-send-btn:hover {
+      background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+      transform: scale(1.04);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
     }
 
-    .skeuo-send-btn:active {
-      background: linear-gradient(135deg, #15803d 0%, #166534 100%);
-      transform: translateY(1px);
+    .premium-send-btn:active {
+      transform: scale(0.96);
     }
 
-    .skeuo-card {
-      background: linear-gradient(145deg, #ffffff, #f8fafc);
+    /* Frosted glass result card */
+    .premium-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       box-shadow: 
-        0 25px 50px -12px rgba(0, 0, 0, 0.35),
-        0 10px 20px -5px rgba(0, 0, 0, 0.15),
-        inset 1px 1px 2px rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(226, 232, 240, 0.85);
+        0 30px 60px -15px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        inset 0 1px 1px rgba(255, 255, 255, 0.1);
     }
 
-    .skeuo-title {
-      color: #0f172a;
-      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9), 0 2px 8px rgba(0, 0, 0, 0.1);
+    .brand-title {
+      background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.03em;
     }
   </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-between py-12 px-4 selection:bg-green-500 selection:text-white">
+<body class="min-h-screen flex flex-col items-center justify-between py-14 px-4 selection:bg-emerald-500 selection:text-white relative">
 
   <!-- Brand Title -->
-  <header class="w-full text-center pt-2">
-    <h1 class="skeuo-title text-4xl sm:text-5xl font-extrabold tracking-tight">
+  <header class="w-full text-center pt-2 relative z-10">
+    <h1 class="brand-title text-4xl sm:text-5xl font-extrabold tracking-tight">
       CivicTrustHub
     </h1>
-    <p class="text-xs uppercase tracking-widest text-slate-500 font-semibold mt-1">Real-Time Corroboration Engine</p>
+    <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400 font-semibold mt-1.5">Real-Time Corroboration Engine</p>
   </header>
 
   <!-- Main Content Area -->
-  <main class="w-full max-w-xl flex flex-col items-center -mt-16 sm:-mt-24 space-y-8">
+  <main class="w-full max-w-xl flex flex-col items-center -mt-16 sm:-mt-24 space-y-8 relative z-10">
     
     <!-- Search Form -->
     <form onsubmit="handleSearch(event)" class="w-full">
-      <div class="skeuo-search-container p-2.5 rounded-full flex items-center gap-2">
+      <div class="premium-search-container p-2.5 rounded-full flex items-center gap-2">
         <input 
           type="text" 
           id="rumorInput" 
           maxlength="300"
           placeholder="Search rumor (e.g. Cyclone alert, school holiday, दिल्ली बाढ़)..." 
-          class="skeuo-input flex-1 px-6 py-4 rounded-full text-slate-800 placeholder-slate-400 focus:outline-none text-base border-none"
+          class="premium-input flex-1 px-6 py-4 rounded-full text-slate-100 placeholder-slate-400 focus:outline-none text-base border-none"
           required
         />
         
@@ -101,7 +133,7 @@
           type="submit" 
           id="submitBtn" 
           title="Verify Claim"
-          class="skeuo-send-btn w-12 h-12 rounded-full text-white flex items-center justify-center shrink-0 cursor-pointer"
+          class="premium-send-btn w-12 h-12 rounded-full text-white flex items-center justify-center shrink-0 cursor-pointer"
         >
           <svg class="w-5 h-5 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor">
             <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
@@ -112,32 +144,32 @@
 
     <!-- Loading State -->
     <div id="loadingIndicator" class="hidden flex flex-col items-center justify-center space-y-3 py-4">
-      <div class="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-      <p class="text-xs uppercase tracking-wider text-slate-600 font-semibold">Corroborating across live sources...</p>
+      <div class="w-8 h-8 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Corroborating across live sources...</p>
     </div>
 
     <!-- 3-State Verdict Card -->
-    <div id="resultBox" class="hidden skeuo-card w-full max-w-md p-6 rounded-3xl text-center transition-all duration-300">
+    <div id="resultBox" class="hidden premium-card w-full max-w-md p-6 rounded-3xl text-center transition-all duration-300">
       <div class="flex items-center justify-between mb-2">
         <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Verification Verdict</span>
-        <span id="confidenceBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200"></span>
+        <span id="confidenceBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700/80"></span>
       </div>
       
       <!-- Verdict Display -->
       <div id="verdictText" class="text-3xl sm:text-4xl font-black tracking-wider my-1"></div>
       
       <!-- Classification Sub-heading -->
-      <p id="classificationText" class="text-xs font-semibold text-slate-500 mt-1 mb-3"></p>
+      <p id="classificationText" class="text-xs font-semibold text-slate-400 mt-1 mb-3"></p>
 
       <!-- Source Evidence Container -->
-      <div id="evidenceContainer" class="mt-3 pt-3 border-t border-slate-100 text-left hidden">
+      <div id="evidenceContainer" class="mt-3 pt-3 border-t border-slate-700/50 text-left hidden">
         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Source Evidence</span>
-        <p id="evidenceText" class="text-xs text-slate-700 leading-relaxed italic bg-slate-50 p-3 rounded-xl border border-slate-200/60"></p>
+        <p id="evidenceText" class="text-xs text-slate-200 leading-relaxed italic bg-slate-900/60 p-3 rounded-xl border border-slate-700/60"></p>
         
         <!-- Regional Hindi Advisory -->
         <div id="hindiContainer" class="mt-2 text-left hidden">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">हिंदी सूचना (Regional Advisory)</span>
-          <p id="hindiText" class="text-xs text-slate-700 bg-amber-50/60 p-2.5 rounded-lg border border-amber-200/60 leading-relaxed"></p>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400 block mb-1">हिंदी सूचना (Regional Advisory)</span>
+          <p id="hindiText" class="text-xs text-amber-200/90 bg-amber-950/40 p-2.5 rounded-lg border border-amber-700/40 leading-relaxed"></p>
         </div>
       </div>
     </div>
@@ -198,9 +230,9 @@
 
         if (isGreeting || isTooShort || isNumbersOnly || isConversational) {
           verdictText.textContent = "Please check rumors only.";
-          verdictText.className = "text-xl sm:text-2xl font-bold text-amber-600 tracking-normal py-2";
+          verdictText.className = "text-xl sm:text-2xl font-bold text-amber-400 tracking-normal py-2";
           confidenceBadge.textContent = "Invalid Query";
-          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
+          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-950/60 text-amber-300 border border-amber-800/60";
           classificationText.textContent = "Conversational prompt or non-assertion query detected.";
           resultBox.classList.remove('hidden');
           return;
@@ -238,9 +270,9 @@
             const data = await res.json();
             if (data.is_invalid) {
               verdictText.textContent = data.message || "Please check rumors only.";
-              verdictText.className = "text-xl sm:text-2xl font-bold text-amber-600 tracking-normal py-2";
+              verdictText.className = "text-xl sm:text-2xl font-bold text-amber-400 tracking-normal py-2";
               confidenceBadge.textContent = "Invalid Query";
-              confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
+              confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-950/60 text-amber-300 border border-amber-800/60";
               classificationText.textContent = data.ground_truth ? data.ground_truth.text : "";
               resultBox.classList.remove('hidden');
               return;
@@ -358,24 +390,24 @@
         // Render 3-State Verdict
         if (verdict === "VERIFIED") {
           verdictText.textContent = "VERIFIED";
-          verdictText.className = "text-3xl sm:text-4xl font-black text-emerald-600 tracking-wider";
+          verdictText.className = "text-3xl sm:text-4xl font-black text-emerald-400 tracking-wider";
           confidenceBadge.textContent = confidenceScore ? `${Math.round(confidenceScore * 100)}% Match` : "Corroborated";
-          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
+          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-950/70 text-emerald-300 border border-emerald-800/60";
         } else if (verdict === "CONTRADICTED") {
           verdictText.textContent = "CONTRADICTED";
-          verdictText.className = "text-3xl sm:text-4xl font-black text-rose-600 tracking-wider";
+          verdictText.className = "text-3xl sm:text-4xl font-black text-rose-400 tracking-wider";
           confidenceBadge.textContent = confidenceScore ? `${Math.round(confidenceScore * 100)}% Contradiction` : "Refuted";
-          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
+          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-950/70 text-rose-300 border border-rose-800/60";
         } else if (verdict === "NETWORK_ERROR") {
           verdictText.textContent = "UNAVAILABLE";
-          verdictText.className = "text-2xl sm:text-3xl font-bold text-amber-700 tracking-normal py-1";
+          verdictText.className = "text-2xl sm:text-3xl font-bold text-amber-400 tracking-normal py-1";
           confidenceBadge.textContent = "Network Error";
-          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300";
+          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-950/70 text-amber-300 border border-amber-800/60";
         } else {
           verdictText.textContent = "UNVERIFIED";
-          verdictText.className = "text-3xl sm:text-4xl font-black text-amber-500 tracking-wider";
+          verdictText.className = "text-3xl sm:text-4xl font-black text-amber-400 tracking-wider";
           confidenceBadge.textContent = "No Confirmation";
-          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
+          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-950/70 text-amber-300 border border-amber-800/60";
         }
 
         classificationText.textContent = classification;
@@ -394,9 +426,9 @@
       } catch (err) {
         console.error('Execution notice:', err);
         verdictText.textContent = "UNAVAILABLE";
-        verdictText.className = "text-2xl sm:text-3xl font-bold text-slate-700 tracking-normal py-1";
+        verdictText.className = "text-2xl sm:text-3xl font-bold text-slate-400 tracking-normal py-1";
         confidenceBadge.textContent = "Execution Error";
-        confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200";
+        confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700";
         classificationText.textContent = "Temporary execution error occurred while scanning dispatches.";
         evidenceContainer.classList.add('hidden');
         hindiContainer.classList.add('hidden');
