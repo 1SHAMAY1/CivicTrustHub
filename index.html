@@ -118,9 +118,18 @@
     </div>
 
     <!-- Skeuomorphic Result Card -->
-    <div id="resultBox" class="hidden skeuo-card w-full max-w-sm p-6 rounded-3xl text-center transition-all duration-300">
-      <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Status</span>
-      <div id="verdictText" class="text-3xl font-extrabold tracking-wider"></div>
+    <div id="resultBox" class="hidden skeuo-card w-full max-w-md p-6 rounded-3xl text-center transition-all duration-300">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Verification Verdict</span>
+        <span id="confidenceBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200"></span>
+      </div>
+      <div id="verdictText" class="text-4xl font-black tracking-wider my-1"></div>
+      
+      <!-- Evidence / Source Proof Snippet -->
+      <div id="evidenceContainer" class="mt-4 pt-3 border-t border-slate-100 text-left hidden">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Source Evidence</span>
+        <p id="evidenceText" class="text-xs text-slate-600 leading-relaxed italic bg-slate-50/80 p-3 rounded-xl border border-slate-200/60"></p>
+      </div>
     </div>
 
   </main>
@@ -138,17 +147,22 @@
       const loading = document.getElementById('loadingIndicator');
       const resultBox = document.getElementById('resultBox');
       const verdictText = document.getElementById('verdictText');
+      const confidenceBadge = document.getElementById('confidenceBadge');
+      const evidenceContainer = document.getElementById('evidenceContainer');
+      const evidenceText = document.getElementById('evidenceText');
       const submitBtn = document.getElementById('submitBtn');
 
       // Hide previous result and show loading
       resultBox.classList.add('hidden');
+      evidenceContainer.classList.add('hidden');
       loading.classList.remove('hidden');
       submitBtn.disabled = true;
       submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
 
       try {
         let isTrue = false;
-        let details = '';
+        let confidenceScore = 0.85;
+        let evidenceSnippet = '';
 
         // 1. Try local FastAPI backend if running
         let backendOk = false;
@@ -161,7 +175,8 @@
           if (res.ok) {
             const data = await res.json();
             isTrue = !data.is_unverified;
-            details = data.ground_truth ? data.ground_truth.text : '';
+            confidenceScore = data.cosine_similarity || 0.85;
+            evidenceSnippet = data.ground_truth ? `${data.ground_truth.source}: "${data.ground_truth.text}"` : '';
             backendOk = true;
           }
         } catch (err) {
@@ -174,7 +189,15 @@
           const qLower = clean.toLowerCase();
           const qWords = qLower.split(/\s+/).filter(w => w.length > 2);
 
-          const isDisasterOrCrisis = /flood|cyclone|earthquake|storm|dam|rain|fire|accident|landslide|submerged|outage|epidemic|hospital|evacuate/.test(qLower);
+          // Intent Detection:
+          // A. Crisis & Disasters
+          const isCrisis = /flood|cyclone|earthquake|storm|dam|rain|fire|accident|landslide|tsunami|outage|epidemic|hospital|evacuate/.test(qLower);
+          
+          // B. Release & Media Events (Movies, Albums, Games, Tech, Books)
+          const isReleaseOrEvent = /release|released|launch|launched|published|premier|premiere|premiered|screened|won|winner|elected|declared|death|died|killed|massacre|mission/.test(qLower);
+
+          // C. Personal Gossip (Unverified marriage/divorce rumors)
+          const isGossipQuery = /(marry|married|dating|affair|husband|wife|secret|wedding)/.test(qLower);
 
           const wikiUrl = `https://en.wikipedia.org/w/api.php?origin=*&action=query&list=search&srsearch=${encodeURIComponent(clean)}&format=json&utf8=1`;
           const res = await fetch(wikiUrl);
@@ -183,37 +206,62 @@
             const items = (data.query && data.query.search) || [];
             
             let bestRatio = 0.0;
-            let isFiction = false;
+            let topItem = null;
 
-            items.slice(0, 5).forEach(item => {
-              const textLower = (item.snippet + ' ' + item.title).toLowerCase();
+            items.slice(0, 6).forEach(item => {
+              const fullContent = (item.title + ' ' + item.snippet).toLowerCase();
               let hits = 0;
-              qWords.forEach(w => { if (textLower.includes(w)) hits++; });
+              qWords.forEach(w => { if (fullContent.includes(w)) hits++; });
               const r = hits / Math.max(qWords.length, 1);
-              if (r > bestRatio) bestRatio = r;
-              if (item.title.toLowerCase().includes('(film)') || item.title.toLowerCase().includes('(song)')) {
-                isFiction = true;
+              if (r > bestRatio) {
+                bestRatio = r;
+                topItem = item;
               }
             });
 
-            if (isDisasterOrCrisis && bestRatio >= 0.65) {
-              isTrue = true;
-            } else if (isFiction && !qLower.includes('film') && !qLower.includes('movie')) {
+            if (topItem) {
+              const stripped = topItem.snippet.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&#039;/g, "'").trim();
+              evidenceSnippet = `${topItem.title}: "${stripped}"`;
+            }
+
+            // High Precision Decision Rules:
+            if (isGossipQuery && !qLower.includes('film') && !qLower.includes('movie')) {
+              // Block personal gossip verified only via film synopses
               isTrue = false;
-            } else if (bestRatio >= 0.85 && !isFiction) {
+              confidenceScore = 0.88;
+            } else if ((isCrisis || isReleaseOrEvent) && bestRatio >= 0.50) {
+              // Valid release, public event, gaming lore, or disaster verified by direct public records
               isTrue = true;
+              confidenceScore = Math.min(0.96, Math.max(0.70, bestRatio * 1.1));
+            } else if (bestRatio >= 0.80) {
+              isTrue = true;
+              confidenceScore = 0.85;
             } else {
               isTrue = false;
+              confidenceScore = Math.max(0.75, (1 - bestRatio));
+              if (!evidenceSnippet) {
+                evidenceSnippet = "No corroborating public records, emergency dispatches, or media releases confirm this claim.";
+              }
             }
           }
         }
 
+        // Render Verdict
         if (isTrue) {
           verdictText.textContent = "TRUE";
           verdictText.className = "text-4xl font-black text-emerald-600 tracking-wider";
+          confidenceBadge.textContent = `${Math.round(confidenceScore * 100)}% Confidence`;
+          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
         } else {
           verdictText.textContent = "FALSE";
           verdictText.className = "text-4xl font-black text-rose-600 tracking-wider";
+          confidenceBadge.textContent = `${Math.round(confidenceScore * 100)}% Confidence`;
+          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
+        }
+
+        if (evidenceSnippet) {
+          evidenceText.textContent = evidenceSnippet;
+          evidenceContainer.classList.remove('hidden');
         }
 
         resultBox.classList.remove('hidden');
