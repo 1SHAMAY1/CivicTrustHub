@@ -19,12 +19,18 @@ Unverified rumors, fabricated news, and coordinated disinformation proliferate a
 
 ---
 
-## 🛡️ Multi-Layer Precision & Robustness Engine
-To prevent hallucinated verdicts and bag-of-words pitfalls, CivicTrustHub processes claims through 4 robust analytical layers:
-1. **Conversational & Non-Assertion Guard**: Detects questions (`"how to..."`, `"what is..."`), 2nd-person chat prompts (`"tell me about yourself"`), and conversational praise, guiding the user to input assertive claims only.
-2. **Directional Polarity & Negation Logic**: Distinguishes affirmative claims from negative assertions (`"not married"`, `"never happened"`), evaluating sign alignment between the claim and the retrieved evidence.
-3. **Temporal Future-Tense Guard**: Analyzes publication dates and future modal qualifiers (`"scheduled for 2026"`, `"upcoming release"`), preventing unreleased upcoming media or events from being falsely marked as completed.
-4. **Calibrated Semantic Tensor Scoring**: Combines subject-action embeddings with cosine similarity thresholds to dynamically scale confidence scores without arbitrary hardcoded jumps.
+## 🛡️ 3-State Factual Verdict Model & Robustness Engine
+To prevent hallucinated verdicts and bag-of-words pitfalls, CivicTrustHub implements a **3-State Factual Architecture**:
+- **VERIFIED (Green)**: Corroborated with multi-source evidence via NLI cross-attention inference ($P_{\text{Entailment}} \ge 0.60$) or strong semantic alignment.
+- **CONTRADICTED (Red)**: Factually disputed or disproven by credible dispatches ($P_{\text{Contradiction}} \ge 0.55$) or identified as unreleased future announcements.
+- **UNVERIFIED (Amber)**: Insufficient or inconclusive data. Absence of evidence is **never** fabricated as false.
+- **SERVICE UNAVAILABLE**: Network drops or timeouts are explicitly signaled to the user rather than faked as "disproved claims".
+
+### Precision Layers:
+1. **Unicode-Preserving Linguistic Normalizer**: Full support for Hindi and regional Indian scripts (Devanagari, Bengali) without character stripping.
+2. **Context-Aware Auxiliary Stripping**: Only strips leading question auxiliaries (`Is`, `Will`, `Can`) if the query ends with `?`, preserving names like "Will Smith".
+3. **Conversational & Typo Filter**: Catches typos (`"slef"`), chat slang (`"how u doing"`), and 2nd-person chat prompts without making redundant network calls.
+4. **Current Year Awareness**: Excludes the current calendar year (`2026`) from future-event checks, ensuring breaking current-year news is never falsely classified as future releases.
 
 ---
 
