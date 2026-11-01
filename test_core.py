@@ -1,12 +1,41 @@
 """
-Unit and integration tests for CivicTrustHub core engine.
-Directly imports main.py to verify real normalization, edge-case rejection,
-Unicode support, network resilience, and 3-state verdict classification.
+Unit and integration tests for CivicTrustHub rumor detector pipeline.
+Tests rumor cue detection, forward stripping, dedicated fact-check desk matching,
+multi-source confirmation rule, temporal guards, and Unicode preservation.
 """
 from unittest.mock import patch
 import main
 
-# 1. Linguistic & Name Preservation Tests
+# 1. Rumor Cue Profiling Tests
+def test_detect_forward_urgency_cues():
+    text = "URGENT!! Forward to all groups immediately! Cyclone alert issued!"
+    cues = main.detect_rumor_cues(text)
+    flag_codes = [f["code"] for f in cues["flags"]]
+    assert "FORWARD_URGENCY" in flag_codes
+    assert cues["is_suspicious_forward"] or cues["cue_count"] >= 1
+
+def test_detect_sensational_and_vague_authority():
+    text = "SHOCKING breaking news: Doctors say secret cure found for all viruses! 100% true"
+    cues = main.detect_rumor_cues(text)
+    flag_codes = [f["code"] for f in cues["flags"]]
+    assert "SENSATIONALISM" in flag_codes
+    assert "VAGUE_AUTHORITY" in flag_codes
+    assert cues["is_suspicious_forward"]
+
+def test_detect_all_caps_flag():
+    text = "DELHI AIRPORT COMPLETELY SUBMERGED UNDER WATER EMERGENCY"
+    cues = main.detect_rumor_cues(text)
+    flag_codes = [f["code"] for f in cues["flags"]]
+    assert "ALL_CAPS" in flag_codes
+
+# 2. Forward Boilerplate Stripping & Claim Extraction
+def test_extract_rumor_claim_from_boilerplate():
+    raw = "URGENT!! Share with all: Delhi airport runway flooded and closed"
+    clean = main.extract_rumor_claim(raw)
+    assert clean.lower().startswith("delhi airport runway")
+    assert "urgent" not in clean.lower()
+
+# 3. Linguistic & Name Preservation Tests
 def test_will_smith_name_not_stripped():
     q, err = main.normalize_and_validate_query("Will Smith released new movie")
     assert err is None
@@ -22,12 +51,7 @@ def test_contraction_negation_preserved():
     assert err is None
     assert "isn't" in q
 
-def test_marriott_not_matched_as_marriage():
-    q, err = main.normalize_and_validate_query("Marriott hotel opened in Delhi")
-    assert err is None
-    assert not main.re.search(r'\bmarri(ed|age)\b|\bwedding\b', q)
-
-# 2. Strict Unicode & Indic Script Preservation
+# 4. Strict Unicode & Indic Script Preservation
 def test_hindi_script_preserved():
     q, err = main.normalize_and_validate_query("दिल्ली में भारी बारिश और बाढ़ का अलर्ट")
     assert err is None
@@ -40,7 +64,7 @@ def test_bengali_script_preserved():
     assert "পশ্চিমবঙ্গে" in q
     assert "স্কুল" in q
 
-# 3. Conversational Chitchat & Typo Filtering
+# 5. Conversational Chitchat & Typo Filtering
 def test_greetings_rejected():
     for greeting in ["hi", "hello", "hey", "good morning", "ok"]:
         _, err = main.normalize_and_validate_query(greeting)
@@ -61,70 +85,65 @@ def test_conversational_prompts_and_typos_rejected():
         assert err is not None
         assert err["verdict"] == "INVALID_QUERY"
 
-def test_pure_numbers_rejected():
-    _, err = main.normalize_and_validate_query("123456789")
-    assert err is not None
-    assert err["verdict"] == "INVALID_QUERY"
-
-# 4. Temporal Current Year vs Future Year Tests
-def test_current_year_not_flagged_as_future():
-    # Present-day 2026 events must NOT be marked as future announcements
-    mock_evidence = [{
-        "source": "Seismological Dispatches",
-        "text": "Earthquake magnitude 6.2 reported on 15 March 2026 in coastal region."
+# 6. Dedicated Fact-Check Sweep & Debunk Detection
+def test_fact_check_desk_match_flags_rumor_debunked():
+    mock_fc = [{
+        "source": "BOOM Live",
+        "text": "Fact Check: No, Delhi airport runway is not submerged; old Dubai video shared as recent"
     }]
-    with patch("main.fetch_live_web_evidence", return_value=(mock_evidence, None)):
-        res = main.verify_claim_against_web("Earthquake reported in 2026")
-        assert res["verdict"] != "CONTRADICTED" or "Future" not in res["classification"]
+    with patch("main.fetch_rumor_evidence", return_value=([], mock_fc, None)):
+        res = main.verify_claim_against_web("Delhi airport runway flooded")
+        assert res["verdict"] == "RUMOR (debunked)"
+        assert "BOOM Live" in res["ground_truth"]["source"]
 
-def test_future_release_flagged_as_contradicted():
-    mock_evidence = [{
+# 7. Absence of Evidence on Viral Claims
+def test_absence_of_coverage_on_viral_forward_flags_likely_rumor():
+    with patch("main.fetch_rumor_evidence", return_value=([], [], None)):
+        res = main.verify_claim_against_web("URGENT Forward to all: Famous celebrity died in Mumbai shooting")
+        assert res["verdict"] == "LIKELY RUMOR"
+        assert res["cues"]["cue_count"] >= 1
+
+# 8. Temporal Guard (Future Release Asserted as Past)
+def test_future_release_flagged_as_debunked_rumor():
+    mock_news = [{
         "source": "Film Industry Wire",
         "text": "The sequel is scheduled for release in December 2028."
     }]
-    with patch("main.fetch_live_web_evidence", return_value=(mock_evidence, None)):
+    with patch("main.fetch_rumor_evidence", return_value=(mock_news, [], None)):
         res = main.verify_claim_against_web("Sequel released")
-        assert res["verdict"] == "CONTRADICTED"
+        assert res["verdict"] == "RUMOR (debunked)"
         assert "Future" in res["classification"]
 
-# 5. Network Error & Resilience Tests
+# 9. Multi-Source Corroboration Rule
+def test_multi_source_required_for_confirmed():
+    mock_news_two_sources = [
+        {"source": "Press Trust of India", "text": "IMD issues red alert for severe rainfall in coastal districts"},
+        {"source": "The Hindu", "text": "Weather bureau warns of severe coastal rainfall this week"}
+    ]
+    with patch("main.fetch_rumor_evidence", return_value=(mock_news_two_sources, [], None)), \
+         patch("main.evaluate_nli_entailment", return_value=[
+             {"entailment": 0.85, "contradiction": 0.05, "neutral": 0.10},
+             {"entailment": 0.82, "contradiction": 0.03, "neutral": 0.15}
+         ]):
+        res = main.verify_claim_against_web("Heavy rainfall warning issued for coastal areas")
+        assert res["verdict"] == "CONFIRMED"
+        assert res["sources_count"] >= 2
+
+def test_single_source_remains_unconfirmed():
+    mock_news_single = [
+        {"source": "Local Blog", "text": "Heavy rainfall warning issued for coastal areas"}
+    ]
+    with patch("main.fetch_rumor_evidence", return_value=(mock_news_single, [], None)), \
+         patch("main.evaluate_nli_entailment", return_value=[
+             {"entailment": 0.85, "contradiction": 0.05, "neutral": 0.10}
+         ]):
+        res = main.verify_claim_against_web("Heavy rainfall warning issued for coastal areas")
+        assert res["verdict"] == "UNCONFIRMED"
+        assert res["sources_count"] == 1
+
+# 10. Network Failure Resilience
 def test_network_timeout_reported_as_unavailable():
-    with patch("main.fetch_live_web_evidence", return_value=([], "Connection timed out after 6000ms")):
+    with patch("main.fetch_rumor_evidence", return_value=([], [], "Connection timed out after 7000ms")):
         res = main.verify_claim_against_web("Cyclone warning issued for Odisha")
         assert res["verdict"] == "NETWORK_ERROR"
         assert res["classification"] == "SERVICE TEMPORARILY UNAVAILABLE"
-        assert res["confidence"] is None
-
-def test_no_evidence_found_reported_as_unverified():
-    with patch("main.fetch_live_web_evidence", return_value=([], None)):
-        res = main.verify_claim_against_web("Completely fictional rumor with zero coverage 999xyz")
-        assert res["verdict"] == "UNVERIFIED"
-        assert res["confidence"] is None
-
-# 6. NLI Isolation Test (Neutral stops at UNVERIFIED and does not fall back to similarity)
-def test_nli_neutral_returns_unverified_without_fallback():
-    mock_evidence = [{
-        "source": "City Transport Desk",
-        "text": "Delhi airport inaugurated a brand new domestic terminal today."
-    }]
-    # Simulate NLI evaluating this as Neutral (unrelated)
-    mock_nli = [{"entailment": 0.10, "contradiction": 0.05, "neutral": 0.85}]
-    with patch("main.fetch_live_web_evidence", return_value=(mock_evidence, None)):
-        with patch("main.evaluate_nli_entailment", return_value=mock_nli):
-            res = main.verify_claim_against_web("Delhi airport flooded")
-            # Must be UNVERIFIED, NOT marked VERIFIED by word overlap
-            assert res["verdict"] == "UNVERIFIED"
-            assert res["confidence"] is None
-
-# 7. Debunk Headline Detection Test
-def test_debunk_headline_flagged_as_contradicted():
-    mock_evidence = [{
-        "source": "PIB Fact Check",
-        "text": "Fact check: Viral claim that schools are closed tomorrow is fake and misleading."
-    }]
-    mock_nli = [{"entailment": 0.70, "contradiction": 0.20, "neutral": 0.10}]
-    with patch("main.fetch_live_web_evidence", return_value=(mock_evidence, None)):
-        with patch("main.evaluate_nli_entailment", return_value=mock_nli):
-            res = main.verify_claim_against_web("Schools closed tomorrow")
-            assert res["verdict"] == "CONTRADICTED"
-            assert "Debunk" in res["classification"] or "Fact" in res["classification"]

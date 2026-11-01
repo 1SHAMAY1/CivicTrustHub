@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CivicTrustHub – Real-Time Rumor Verification</title>
+  <title>CivicTrustHub – Real-Time Rumor Detector</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -69,20 +69,20 @@
     <h1 class="skeuo-title text-4xl sm:text-5xl font-extrabold tracking-tight">
       CivicTrustHub
     </h1>
-    <p class="text-xs uppercase tracking-widest text-slate-400 font-semibold mt-1">Real-Time Corroboration Engine</p>
+    <p class="text-xs uppercase tracking-widest text-slate-400 font-semibold mt-1">Real-Time Rumor Detection & Fact Corroboration</p>
   </header>
 
   <!-- Main Content Area -->
   <main class="w-full max-w-xl flex flex-col items-center -mt-16 sm:-mt-24 space-y-8">
     
-    <!-- Search Form -->
-    <form onsubmit="handleSearch(event)" class="w-full">
+    <!-- Rumor Verification Input Form -->
+    <form onsubmit="handleVerify(event)" class="w-full">
       <div class="skeuo-search-container p-2.5 rounded-full flex items-center gap-2">
         <input 
           type="text" 
           id="rumorInput" 
-          maxlength="300"
-          placeholder="Search rumor (e.g. Cyclone alert, school holiday, दिल्ली बाढ़)..." 
+          maxlength="500"
+          placeholder="Paste suspicious forward, viral claim, or news rumor..." 
           class="skeuo-input flex-1 px-6 py-4 rounded-full text-slate-800 placeholder-slate-400 focus:outline-none text-base border-none"
           required
         />
@@ -90,7 +90,7 @@
         <button 
           type="submit" 
           id="submitBtn" 
-          title="Verify Claim"
+          title="Detect Rumor"
           class="skeuo-send-btn w-12 h-12 rounded-full text-white flex items-center justify-center shrink-0 cursor-pointer"
         >
           <svg class="w-5 h-5 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor">
@@ -103,30 +103,33 @@
     <!-- Loading State -->
     <div id="loadingIndicator" class="hidden flex flex-col items-center justify-center space-y-3 py-4">
       <div class="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-      <p class="text-xs uppercase tracking-wider text-slate-500 font-semibold">Corroborating across live sources...</p>
+      <p class="text-xs uppercase tracking-wider text-slate-500 font-semibold">Running dual fact-check & multi-source news verification...</p>
     </div>
 
-    <!-- 3-State Verdict Card -->
+    <!-- Rumor Detector Verdict Card -->
     <div id="resultBox" class="hidden skeuo-card w-full max-w-md p-6 rounded-3xl text-center transition-all duration-300">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Verification Verdict</span>
-        <span id="confidenceBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200"></span>
+        <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Rumor Verdict</span>
+        <span id="sourcesBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200"></span>
       </div>
       
       <!-- Verdict Display -->
       <div id="verdictText" class="text-3xl sm:text-4xl font-black tracking-wider my-1"></div>
       
       <!-- Classification Sub-heading -->
-      <p id="classificationText" class="text-xs font-semibold text-slate-500 mt-1 mb-3"></p>
+      <p id="classificationText" class="text-xs font-semibold text-slate-500 mt-1 mb-2"></p>
+
+      <!-- Rumor Cue Badges Container -->
+      <div id="cuesContainer" class="flex flex-wrap gap-1.5 justify-center my-3 hidden"></div>
 
       <!-- Source Evidence Container -->
       <div id="evidenceContainer" class="mt-3 pt-3 border-t border-slate-100 text-left hidden">
-        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Source Evidence</span>
+        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Corroborating Dispatches</span>
         <p id="evidenceText" class="text-xs text-slate-700 leading-relaxed italic bg-slate-50 p-3 rounded-xl border border-slate-200/60"></p>
         
-        <!-- Regional Hindi Advisory -->
+        <!-- Regional Advisory -->
         <div id="hindiContainer" class="mt-2 text-left hidden">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">हिंदी सूचना (Regional Advisory)</span>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">हिंदी परामर्श (Regional Advisory)</span>
           <p id="hindiText" class="text-xs text-slate-600 bg-amber-50/50 p-2.5 rounded-lg border border-amber-200/50 leading-relaxed"></p>
         </div>
       </div>
@@ -137,7 +140,7 @@
   <div class="h-6"></div>
 
   <script>
-    // Configurable API base for deployed backends (e.g. Render / Railway / Hugging Face Spaces)
+    // Configurable API base for deployed backends
     const API_BASE = window.API_BASE || (['localhost', '127.0.0.1'].includes(window.location.hostname) ? 'http://127.0.0.1:8000' : '');
 
     // Robust Unicode text cleaning preserving Indic letters and combining marks
@@ -145,7 +148,7 @@
       return str.replace(/’/g, "'").replace(/[^\p{L}\p{N}\s\?']/gu, ' ').trim();
     }
 
-    async function handleSearch(e) {
+    async function handleVerify(e) {
       e.preventDefault();
       
       const input = document.getElementById('rumorInput').value.trim();
@@ -154,8 +157,9 @@
       const loading = document.getElementById('loadingIndicator');
       const resultBox = document.getElementById('resultBox');
       const verdictText = document.getElementById('verdictText');
-      const confidenceBadge = document.getElementById('confidenceBadge');
+      const sourcesBadge = document.getElementById('sourcesBadge');
       const classificationText = document.getElementById('classificationText');
+      const cuesContainer = document.getElementById('cuesContainer');
       const evidenceContainer = document.getElementById('evidenceContainer');
       const evidenceText = document.getElementById('evidenceText');
       const hindiContainer = document.getElementById('hindiContainer');
@@ -165,6 +169,8 @@
       resultBox.classList.add('hidden');
       evidenceContainer.classList.add('hidden');
       hindiContainer.classList.add('hidden');
+      cuesContainer.classList.add('hidden');
+      cuesContainer.innerHTML = '';
       loading.classList.remove('hidden');
       submitBtn.disabled = true;
       submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
@@ -175,7 +181,7 @@
         const cleanNoPunct = cleanRaw.replace(/\?/g, '').trim();
         const rawWords = cleanNoPunct.split(/\s+/).filter(Boolean);
 
-        // Conversational & Greeting Filter (Unicode-aware, handles typos like 'slef', slang 'how u')
+        // Conversational & Greeting Filter
         const commonGreetings = ['hi', 'hello', 'hey', 'test', 'testing', 'good morning', 'good afternoon', 'good evening', 'bye', 'ok', 'okay', 'yes', 'no'];
         const isGreeting = commonGreetings.includes(cleanNoPunct);
         const isNumbersOnly = /^\d+$/.test(cleanNoPunct);
@@ -189,27 +195,21 @@
         if (isGreeting || isTooShort || isNumbersOnly || isConversational) {
           verdictText.textContent = "Please check rumors only.";
           verdictText.className = "text-xl sm:text-2xl font-bold text-amber-600 tracking-normal py-2";
-          confidenceBadge.textContent = "Invalid Query";
-          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
+          sourcesBadge.textContent = "Invalid Query";
+          sourcesBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
           classificationText.textContent = "Conversational prompt or non-assertion query detected.";
           resultBox.classList.remove('hidden');
           return;
         }
 
-        // Only strip leading question auxiliary if the sentence ends with '?' (preserves 'Will Smith')
-        let normalizedQuery = cleanNoPunct;
-        if (rawTrim.endsWith('?')) {
-          normalizedQuery = cleanNoPunct.replace(/^(is|are|was|were|did|does|will|can|has|have)\s+/i, '').trim();
-        }
-        if (!normalizedQuery) normalizedQuery = cleanNoPunct;
-
-        let verdict = "UNVERIFIED";
+        let verdict = "UNCONFIRMED";
         let classification = "";
-        let confidenceScore = null;
         let evidenceSnippet = "";
         let counterHi = "";
+        let cues = [];
+        let sourcesCount = 0;
 
-        // 1. Try FastAPI Backend (25s timeout for model loading on cold starts)
+        // Call Backend API
         let backendOk = false;
         const targetUrl = API_BASE ? `${API_BASE}/api/rumors/verify` : '/api/rumors/verify';
 
@@ -229,143 +229,68 @@
             if (data.is_invalid) {
               verdictText.textContent = data.message || "Please check rumors only.";
               verdictText.className = "text-xl sm:text-2xl font-bold text-amber-600 tracking-normal py-2";
-              confidenceBadge.textContent = "Invalid Query";
-              confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
+              sourcesBadge.textContent = "Invalid Query";
+              sourcesBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
               classificationText.textContent = data.ground_truth ? data.ground_truth.text : "";
               resultBox.classList.remove('hidden');
               return;
             }
-            verdict = data.verdict || "UNVERIFIED";
+            verdict = data.verdict || "UNCONFIRMED";
             classification = data.classification || "";
-            confidenceScore = data.confidence || null;
             evidenceSnippet = data.ground_truth ? `${data.ground_truth.source}: "${data.ground_truth.text}"` : "";
             counterHi = data.counter_hi || "";
+            cues = (data.cues && data.cues.flags) || [];
+            sourcesCount = data.sources_count || 0;
             backendOk = true;
           }
         } catch (err) {
           backendOk = false;
         }
 
-        // 2. Client-side Real-time Web Evidence Fallback (Degraded Mode)
+        // Failsafe Fallback (Degraded Mode: Never falsely verifies, defaults to UNCONFIRMED)
         if (!backendOk) {
-          const qLower = normalizedQuery.toLowerCase();
-          const qWords = qLower.split(/\s+/).filter(w => w.length > 2);
-
-          const wikiUrl = `https://en.wikipedia.org/w/api.php?origin=*&action=query&list=search&srsearch=${encodeURIComponent(normalizedQuery)}&format=json&utf8=1`;
-          try {
-            const res = await fetch(wikiUrl);
-            if (res.ok) {
-              const data = await res.json();
-              const items = (data.query && data.query.search) || [];
-              
-              let bestRatio = 0.0;
-              let topItem = null;
-
-              items.slice(0, 6).forEach(item => {
-                const fullContent = (item.title + ' ' + item.snippet).toLowerCase();
-                let hits = 0;
-                qWords.forEach(w => { if (fullContent.includes(w)) hits++; });
-                const r = hits / Math.max(qWords.length, 1);
-                if (r > bestRatio) {
-                  bestRatio = r;
-                  topItem = item;
-                }
-              });
-
-              if (topItem) {
-                const stripped = topItem.snippet.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&#039;/g, "'").trim();
-                evidenceSnippet = `${topItem.title}: "${stripped}"`;
-              }
-
-              const snippetLower = evidenceSnippet.toLowerCase();
-              const currentYear = new Date().getFullYear();
-
-              const queryHasNegation = /\b(not|never|no|unmarried|unreleased|fake|false|hoax|disproved)\b|n't\b/i.test(qLower);
-              const snippetHasNegation = /\b(not|never|no|unmarried|unreleased|unsubstantiated|fake|false|rumor|denied)\b|n't\b/i.test(snippetLower);
-
-              const isClaimingPastEvent = /\b(released|launched|won|died|killed|premiered|happened)\b/i.test(qLower);
-              const futureYearRegex = new RegExp(`\\b(${currentYear + 1}|${currentYear + 2}|${currentYear + 3})\\b`);
-              const isFutureInSnippet = /\b(to be released|will be released|being released in|scheduled for|slated for|anticipated in)\b/i.test(snippetLower) ||
-                                        futureYearRegex.test(snippetLower);
-
-              const isMarriageClaim = /\bmarri(ed|age)\b|\bwedding\b/i.test(qLower);
-
-              if (isClaimingPastEvent && isFutureInSnippet && !qLower.includes('future') && !qLower.includes('upcoming')) {
-                verdict = "CONTRADICTED";
-                classification = "CONTRADICTED – Event scheduled for future, not yet occurred.";
-                confidenceScore = null;
-                evidenceSnippet += " (Source clarifies event is an upcoming announcement).";
-              } else if (isMarriageClaim && !queryHasNegation) {
-                const mentionsUnmarried = /\b(unmarried|bachelor|single|never married|not married)\b/i.test(snippetLower);
-                const relativesOnly = /\b(brother|sister|father|mother|daughter|son|wife of|husband of)\b/i.test(snippetLower);
-                if (mentionsUnmarried || relativesOnly) {
-                  verdict = "CONTRADICTED";
-                  classification = "CONTRADICTED – Biographical records do not verify this marriage.";
-                  confidenceScore = null;
-                } else {
-                  verdict = "UNVERIFIED";
-                  classification = "UNVERIFIED – Inconclusive marital dispatches.";
-                }
-              } else if (bestRatio >= 0.45) {
-                if (queryHasNegation) {
-                  if (snippetHasNegation || (!snippetLower.includes('wife') && !snippetLower.includes('husband'))) {
-                    verdict = "VERIFIED";
-                    classification = "VERIFIED – Corroborated with official negative records.";
-                  } else {
-                    verdict = "CONTRADICTED";
-                    classification = "CONTRADICTED – Disputed by reported dispatches.";
-                  }
-                } else {
-                  if (snippetHasNegation) {
-                    verdict = "CONTRADICTED";
-                    classification = "CONTRADICTED – Reported records dispute this claim.";
-                  } else {
-                    verdict = "VERIFIED";
-                    classification = "VERIFIED – Corroborated by live knowledge sources.";
-                  }
-                }
-                confidenceScore = Number(bestRatio.toFixed(2));
-              } else {
-                verdict = "UNVERIFIED";
-                classification = "UNVERIFIED – Insufficient corroborating records found.";
-                confidenceScore = null;
-                if (!evidenceSnippet) {
-                  evidenceSnippet = "No corroborating public dispatches or emergency records confirm this claim.";
-                }
-              }
-            } else {
-              verdict = "NETWORK_ERROR";
-              classification = "Wikipedia query was not reachable.";
-              evidenceSnippet = "Network issue retrieving live knowledge index. Please retry.";
-            }
-          } catch (netErr) {
-            verdict = "NETWORK_ERROR";
-            classification = "Live knowledge index connection timed out.";
-            evidenceSnippet = "Please verify your internet connection and try again.";
-          }
+          verdict = "UNAVAILABLE";
+          classification = "Verification backend temporarily unreachable. Please retry.";
+          evidenceSnippet = "Network connection to verification streams timed out. Please check connection.";
+          sourcesBadge.textContent = "Offline";
+          sourcesBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200";
         }
 
-        // Render 3-State Verdict
-        if (verdict === "VERIFIED") {
-          verdictText.textContent = "VERIFIED";
+        // Render Rumor Cue Badges
+        if (cues.length > 0) {
+          cuesContainer.innerHTML = cues.map(c => 
+            `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100/70 text-amber-800 border border-amber-300" title="${c.desc}">⚠️ ${c.label}</span>`
+          ).join('');
+          cuesContainer.classList.remove('hidden');
+        }
+
+        // Render Honest Rumor Verdicts
+        if (verdict === "CONFIRMED") {
+          verdictText.textContent = "CONFIRMED";
           verdictText.className = "text-3xl sm:text-4xl font-black text-emerald-600 tracking-wider";
-          confidenceBadge.textContent = confidenceScore ? `${Math.round(confidenceScore * 100)}% Match` : "Corroborated";
-          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
-        } else if (verdict === "CONTRADICTED") {
-          verdictText.textContent = "CONTRADICTED";
-          verdictText.className = "text-3xl sm:text-4xl font-black text-rose-600 tracking-wider";
-          confidenceBadge.textContent = confidenceScore ? `${Math.round(confidenceScore * 100)}% Contradiction` : "Refuted";
-          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
-        } else if (verdict === "NETWORK_ERROR") {
+          sourcesBadge.textContent = sourcesCount >= 2 ? `${sourcesCount} Sources Corroborated` : "Corroborated";
+          sourcesBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
+        } else if (verdict.includes("RUMOR (debunked)")) {
+          verdictText.textContent = "RUMOR (Debunked)";
+          verdictText.className = "text-2xl sm:text-3xl font-black text-rose-600 tracking-wider";
+          sourcesBadge.textContent = "Debunked";
+          sourcesBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
+        } else if (verdict === "LIKELY RUMOR") {
+          verdictText.textContent = "LIKELY RUMOR";
+          verdictText.className = "text-2xl sm:text-3xl font-black text-rose-500 tracking-wider";
+          sourcesBadge.textContent = "Unsubstantiated Forward";
+          sourcesBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200";
+        } else if (verdict === "NETWORK_ERROR" || verdict === "UNAVAILABLE") {
           verdictText.textContent = "UNAVAILABLE";
           verdictText.className = "text-2xl sm:text-3xl font-bold text-amber-700 tracking-normal py-1";
-          confidenceBadge.textContent = "Network Error";
-          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300";
+          sourcesBadge.textContent = "Network Error";
+          sourcesBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300";
         } else {
-          verdictText.textContent = "UNVERIFIED";
+          // UNCONFIRMED
+          verdictText.textContent = "UNCONFIRMED";
           verdictText.className = "text-3xl sm:text-4xl font-black text-amber-500 tracking-wider";
-          confidenceBadge.textContent = "No Confirmation";
-          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
+          sourcesBadge.textContent = sourcesCount > 0 ? `${sourcesCount} Source (Uncorroborated)` : "No Coverage";
+          sourcesBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
         }
 
         classificationText.textContent = classification;
@@ -385,8 +310,8 @@
         console.error('Execution notice:', err);
         verdictText.textContent = "UNAVAILABLE";
         verdictText.className = "text-2xl sm:text-3xl font-bold text-slate-700 tracking-normal py-1";
-        confidenceBadge.textContent = "Execution Error";
-        confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200";
+        sourcesBadge.textContent = "Execution Error";
+        sourcesBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200";
         classificationText.textContent = "Temporary execution error occurred while scanning dispatches.";
         evidenceContainer.classList.add('hidden');
         hindiContainer.classList.add('hidden');
