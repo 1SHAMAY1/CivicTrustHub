@@ -1,0 +1,22 @@
+[
+  {
+    "id": "R1",
+    "text": "The city will shut down all schools tomorrow due to a flood.",
+    "lang": "en"
+  },
+  {
+    "id": "R2",
+    "text": "डॉक्टरों का कहना है कि इस मौसम में एचआईवी का खतरना बढ़ेगा।",
+    "lang": "hi"
+  },
+  {
+    "id": "R3",
+    "text": "No power cuts today, the grid is stable.",
+    "lang": "en"
+  },
+  {
+    "id": "R4",
+    "text": "सरकार ने सभी सार्वजनिक पार्कों को 24 घंटे खोलने का आदेश दिया।",
+    "lang": "hi"
+  }
+]

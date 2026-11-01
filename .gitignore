@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.venv/
+venv/
+*.egg-info/
+
+# App generated files
+civictrust_packet.zip
+
+# macOS
+.DS_Store
+
+# Model files (too large for git)
+miniLM_quantized/
+*.bin
+*.pt
+*.pth
+
+# Editor
+.idea/
+.vscode/
+
+# Junk folders (leftover from shell mis-commands)
+#/
+a/
+create/
+env/
+inside/
+lightweight/
+project/
+the/
