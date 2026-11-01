@@ -52,33 +52,41 @@ To prevent hallucinated verdicts and bag-of-words pitfalls, CivicTrustHub implem
 flowchart TD
     User([Citizens / Target Audience]) -->|Enter claim or viral rumor| UI[Tactile Skeuomorphic UI - index.html]
     
-    subgraph PreValidation ["Input Validation & Edge Filter"]
+    subgraph PreValidation ["Input Validation & Unicode Cleaner"]
         UI --> EdgeFilter{Is Rumor or Edge Case?}
-        EdgeFilter -->|Greeting / Number / Too Short| Warning["Alert: 'Please check rumors only.'"]
+        EdgeFilter -->|Greeting / Number / Chitchat| Warning["Alert: 'Please check rumors only.'"]
     end
 
     subgraph RuntimeDispatch ["Execution Strategy Switch"]
         EdgeFilter -->|Valid Assertive Claim| EnvSwitch{Host Environment?}
-        EnvSwitch -->|Localhost / Native App| BackendAPI["FastAPI: POST /api/rumors/verify"]
-        EnvSwitch -->|GitHub Pages / Web App| ClientLiveEngine[Browser Real-Time Web Engine]
+        EnvSwitch -->|Localhost / Deployed Backend| BackendAPI["FastAPI: POST /api/rumors/verify"]
+        EnvSwitch -->|Standalone / Client Fallback| ClientLiveEngine[Browser Real-Time Web Engine]
     end
 
     subgraph ServerBackend ["Server Engine (main.py)"]
-        BackendAPI --> ServerEdge{Backend Edge Validator}
-        ServerEdge -->|Invalid Query| FastReject["Return 200: 'Please check rumors only.'"]
-        ServerEdge -->|Valid Claim| LiveSweep[Live Ingestion: Google News RSS + Wiki API]
-        LiveSweep --> TensorMatcher["Semantic Tensor Matcher (PyTorch MiniLM / TF-IDF Vector)"]
-        TensorMatcher --> PolarityTemporal["Polarity Alignment & Temporal Guard Engine"]
-        PolarityTemporal --> ScoreEngine["Cosine Similarity & Panic Index Classifier"]
+        BackendAPI --> TemporalCheck{Pre-Check: Future Event?}
+        TemporalCheck -->|Future Announcement| FutureContradict["Verdict: CONTRADICTED (Scheduled in future)"]
+        TemporalCheck -->|Present/Past Event| LiveSweep[Live Ingestion: Google News RSS + Wiki API]
+        LiveSweep --> NetCheck{Ingestion Succeeded?}
+        NetCheck -->|Connection Failure| NetError["Verdict: SERVICE UNAVAILABLE (Network Error)"]
+        NetCheck -->|Zero Coverage| ZeroUnverified["Verdict: UNVERIFIED (No Confirmation)"]
+        NetCheck -->|Passages Found| NLI["DeBERTa-v3 NLI Cross-Encoder (~500MB)"]
+        NLI --> DebunkCheck{Fact-Check / Debunk Headline?}
+        DebunkCheck -->|Yes| DebunkContradict["Verdict: CONTRADICTED (Refuted by Fact-Check)"]
+        DebunkCheck -->|No| InferenceProb[Softmax: Entailment vs Contradiction vs Neutral]
     end
 
-    subgraph BrowserEngine ["In-Browser Engine"]
+    subgraph BrowserEngine ["In-Browser Degraded Mode"]
         ClientLiveEngine --> WikiSearch[Wikimedia Real-Time REST Search]
-        WikiSearch --> PolarityTemporalClient["Polarity & Future-Tense Analysis"]
-        PolarityTemporalClient --> KeywordDensity[Calibrated Confidence Scorer]
+        WikiSearch --> PolarityTemporalClient["Polarity & Temporal Guard"]
+        PolarityTemporalClient --> KeywordDensity[Calibrated Match Scorer]
     end
 
-    ScoreEngine --> VerdictCard[Verdict Card: TRUE / FALSE + Proof Evidence]
+    InferenceProb --> VerdictCard[3-State Verdict Card: VERIFIED / CONTRADICTED / UNVERIFIED]
+    DebunkContradict --> VerdictCard
+    FutureContradict --> VerdictCard
+    ZeroUnverified --> VerdictCard
+    NetError --> VerdictCard
     KeywordDensity --> VerdictCard
     VerdictCard --> UI
 ```
@@ -154,5 +162,11 @@ uvicorn main:app --reload --port 8000
 ```
 Open your browser at `http://127.0.0.1:8000` to interact with the live engine.
 
-### 4. Or Run Static Frontend Directly
+### 4. Run the Core Verification Suite
+Run the unit test suite verifying Unicode scripts, interrogative auxiliary handling, network timeout handling, and 3-state verdicts:
+```bash
+python -X utf8 -c "import test_core; [getattr(test_core, n)() for n in dir(test_core) if n.startswith('test_')]; print('All 15 core tests passed.')"
+```
+
+### 5. Or Run Static Frontend Directly
 You can also open `index.html` directly or visit the [Live GitHub Pages Demo](https://1shamay1.github.io/CivicTrustHub/).
