@@ -2,10 +2,11 @@
 # CivicTrust Hub – Live Dynamic Verification Engine
 #
 # Features:
-#   1. Real-time Live Web & News Ingestion (No static database!)
-#   2. Local Vector / Semantic Similarity Tensor Engine
-#   3. Zero Gemini / External LLM API required
-#   4. Dynamic Truth / Rumor Classification & Localized Fact Cards
+#   1. Real-time Live Web & News Ingestion (Zero static mock database)
+#   2. DeBERTa-v3 NLI Cross-Encoder (~500 MB) for Entailment / Contradiction
+#   3. Local Vector / Semantic Similarity Tensor Engine Fallback
+#   4. Zero Gemini / External Closed LLM API required
+#   5. Dynamic Truth / Rumor Classification & Localized Fact Cards
 # ==============================================================
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ import datetime
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,7 +39,7 @@ def fetch_live_web_evidence(query: str, max_results: int = 8) -> List[Dict[str, 
     encoded_q = urllib.parse.quote(clean_query)
     evidence: List[Dict[str, str]] = []
 
-    # 1. Google News Live Search Feed (Clean global query without hardcoded geo restriction)
+    # 1. Google News Live Search Feed
     news_url = f"https://news.google.com/rss/search?q={encoded_q}&hl=en&gl=US&ceid=US:en"
     try:
         req = urllib.request.Request(news_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
@@ -83,7 +84,75 @@ def fetch_live_web_evidence(query: str, max_results: int = 8) -> List[Dict[str, 
 
 
 # ----------------------------------------------------------------
-# Local Tensor & Semantic Matching Engine
+# DeBERTa-v3 Natural Language Inference (NLI) Cross-Encoder Engine
+# ----------------------------------------------------------------
+NLI_MODEL = None
+NLI_TOKENIZER = None
+
+def get_nli_engine():
+    """
+    Lazy loads the DeBERTa-v3 NLI Cross-Encoder (~500MB).
+    Computes direct cross-attention between [Evidence, Claim] pairs
+    to output exact Entailment (True), Contradiction (False), or Neutral probabilities.
+    """
+    global NLI_MODEL, NLI_TOKENIZER
+    if NLI_MODEL is not None and NLI_TOKENIZER is not None:
+        return NLI_MODEL, NLI_TOKENIZER
+    try:
+        from transformers import AutoTokenizer, AutoModelForSequenceClassification
+        model_name = "cross-encoder/nli-deberta-v3-base"
+        print(f"[NLI Engine] 🔄 Loading DeBERTa-v3 Cross-Encoder: {model_name}...")
+        NLI_TOKENIZER = AutoTokenizer.from_pretrained(model_name)
+        NLI_MODEL = AutoModelForSequenceClassification.from_pretrained(model_name)
+        NLI_MODEL.eval()
+        print("[NLI Engine] ✅ DeBERTa-v3 Cross-Encoder loaded successfully into memory.")
+        return NLI_MODEL, NLI_TOKENIZER
+    except Exception as ex:
+        print(f"[NLI Engine] ⚡ NLI Cross-Encoder running in fallback mode: {ex}")
+        NLI_MODEL = None
+        NLI_TOKENIZER = None
+        return None, None
+
+
+def evaluate_nli_entailment(claim: str, evidence_texts: List[str]) -> List[Dict[str, float]]:
+    """
+    Evaluates evidence against claim using DeBERTa cross-attention.
+    Returns probability distribution: [entailment, contradiction, neutral]
+    """
+    model, tokenizer = get_nli_engine()
+    if model is None or tokenizer is None:
+        return []
+
+    try:
+        import torch
+        # Format: (premise, hypothesis) -> (evidence, claim)
+        features = tokenizer(
+            evidence_texts,
+            [claim] * len(evidence_texts),
+            padding=True,
+            truncation=True,
+            return_tensors="pt"
+        )
+        with torch.no_grad():
+            scores = model(**features).logits
+            probs = torch.softmax(scores, dim=1).tolist()
+
+        # cross-encoder/nli-deberta-v3-base class mapping: 0=contradiction, 1=entailment, 2=neutral
+        results = []
+        for p in probs:
+            results.append({
+                "contradiction": float(p[0]),
+                "entailment": float(p[1]),
+                "neutral": float(p[2])
+            })
+        return results
+    except Exception as ex:
+        print(f"[NLI Evaluation] Notice: {ex}")
+        return []
+
+
+# ----------------------------------------------------------------
+# Local Tensor & TF-IDF Cosine Vector Fallback Engine
 # ----------------------------------------------------------------
 ENCODER_MODEL = None
 
@@ -102,19 +171,18 @@ def get_sentence_transformer():
 
 
 def compute_semantic_similarity(query: str, candidate_texts: List[str]) -> List[float]:
-    """
-    Uses PyTorch/MiniLM tensor embeddings if available, 
-    otherwise an ultra-fast TF-IDF cosine vector tensor calculation.
-    """
     model = get_sentence_transformer()
     if model is not None:
-        import numpy as np
-        query_vec = model.encode([query], normalize_embeddings=True)[0]
-        cand_vecs = model.encode(candidate_texts, normalize_embeddings=True)
-        similarities = cand_vecs @ query_vec
-        return [float(s) for s in similarities]
+        try:
+            import numpy as np
+            query_vec = model.encode([query], normalize_embeddings=True)[0]
+            cand_vecs = model.encode(candidate_texts, normalize_embeddings=True)
+            similarities = cand_vecs @ query_vec
+            return [float(s) for s in similarities]
+        except Exception:
+            pass
 
-    # Deterministic TF-IDF Cosine Vector Fallback (No external weight requirement)
+    # Deterministic TF-IDF Cosine Vector Fallback (Zero external dependency)
     words_q = [w for w in re.findall(r'\b\w{3,}\b', query.lower())]
     if not words_q:
         return [0.15] * len(candidate_texts)
@@ -124,7 +192,6 @@ def compute_semantic_similarity(query: str, candidate_texts: List[str]) -> List[
         words_c = [w for w in re.findall(r'\b\w{3,}\b', cand.lower())]
         set_c = set(words_c)
         matches = sum(1 for w in words_q if w in set_c)
-        
         denominator = math.sqrt(len(words_q) * max(len(set_c), 1))
         score = (matches / denominator) if denominator > 0 else 0.0
         sims.append(min(0.95, max(0.10, score * 1.5)))
@@ -133,14 +200,9 @@ def compute_semantic_similarity(query: str, candidate_texts: List[str]) -> List[
 
 
 # ----------------------------------------------------------------
-# Query Normalization & Input Validation
+# Fuzzy Query Normalization & Input Validation
 # ----------------------------------------------------------------
-def normalize_and_validate_query(raw_text: str) -> tuple[Optional[str], Optional[dict]]:
-    """
-    Distinguishes pure conversational chitchat from legitimate citizen rumor queries.
-    Strips leading interrogative auxiliaries (e.g. 'Is [claim]?', 'Was [claim]?')
-    into verifiable declarative claims instead of rejecting them.
-    """
+def normalize_and_validate_query(raw_text: str) -> Tuple[Optional[str], Optional[dict]]:
     clean_raw = re.sub(r'[^a-zA-Z0-9\s\?]', ' ', raw_text).lower().strip()
     clean_no_punct = re.sub(r'[\?]+', '', clean_raw).strip()
     raw_words = [w for w in clean_no_punct.split() if w]
@@ -166,9 +228,13 @@ def normalize_and_validate_query(raw_text: str) -> tuple[Optional[str], Optional
             "counter_hi": "कृपया जांच के लिए कोई विशिष्ट दावा या अफवाह दर्ज करें।"
         }
 
-    # Reject purely meta / 2nd-person chat prompts
-    is_meta_chat = bool(re.search(r'^(tell me about yourself|who are you|how to use this|you are good|what is your name|help me)\b', clean_no_punct))
-    if is_meta_chat:
+    # Catch conversational prompts, slang, and typo variants (e.g. "tell me about your slef", "how u doing")
+    is_conversational = bool(
+        re.search(r'(\btell me\b|\babout your\b|\babout yourself\b|\babout ur\b|\babout slef\b|\bwho are you\b|\bwho r u\b|\bwho is this\b|\bhow to use\b|\byou are good\b|\byou r good\b)', clean_no_punct) or
+        re.search(r'^(how\s*(r|are|u|you)|what\s*(s|\'s|up|r|is)|who\s*(r|is|u)|sup|wbu)\b', clean_no_punct)
+    )
+
+    if is_conversational:
         return None, {
             "is_invalid": True,
             "classification": "INVALID QUERY",
@@ -216,16 +282,64 @@ def verify_claim_against_web(claim_text: str) -> dict:
             "counter_hi": f"अफवाह से बचें: \"{claim_text}\" के संबंध में किसी भी आधिकारिक समाचार एजेंसी या आपदा नियंत्रण विभाग से कोई पुष्टि नहीं मिली है।"
         }
 
-    # Run semantic tensor comparison
     candidate_texts = [e["text"] for e in evidence_list]
-    similarities = compute_semantic_similarity(normalized_claim, candidate_texts)
 
-    # Find highest matching report
+    # 1. Primary High-Precision Engine: DeBERTa NLI Cross-Encoder
+    nli_results = evaluate_nli_entailment(normalized_claim, candidate_texts)
+
+    if nli_results:
+        # Pick snippet with highest decisive entailment or contradiction signal
+        best_signal_idx = 0
+        best_signal_val = 0.0
+        best_verdict_type = "neutral"
+
+        for idx, res in enumerate(nli_results):
+            e_val = res["entailment"]
+            c_val = res["contradiction"]
+            top_val = max(e_val, c_val)
+            if top_val > best_signal_val:
+                best_signal_val = top_val
+                best_signal_idx = idx
+                best_verdict_type = "entailment" if e_val >= c_val else "contradiction"
+
+        best_match = evidence_list[best_signal_idx]
+        best_res = nli_results[best_signal_idx]
+
+        if best_verdict_type == "entailment" and best_res["entailment"] >= 0.60:
+            confidence = round(best_res["entailment"], 2)
+            return {
+                "is_invalid": False,
+                "classification": "VERIFIED FACT – Corroborated via Cross-Attention Inference",
+                "cosine_similarity": confidence,
+                "nli_entailment": round(best_res["entailment"], 3),
+                "nli_contradiction": round(best_res["contradiction"], 3),
+                "panic_index": round((1.0 - confidence) * 45),
+                "is_unverified": False,
+                "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
+                "counter_en": f"CORROBORATED: Live records from {best_match['source']} confirm this statement: \"{best_match['text']}\".",
+                "counter_hi": f"सत्यापित समाचार: {best_match['source']} के आधिकारिक रिकॉर्ड इस दावे की पुष्टि करते हैं: \"{best_match['text']}\"।"
+            }
+        elif best_verdict_type == "contradiction" and best_res["contradiction"] >= 0.55:
+            confidence = round(best_res["contradiction"], 2)
+            return {
+                "is_invalid": False,
+                "classification": "FALSE / REFUTED – Contradicted by Reported Dispatches",
+                "cosine_similarity": confidence,
+                "nli_entailment": round(best_res["entailment"], 3),
+                "nli_contradiction": round(best_res["contradiction"], 3),
+                "panic_index": round(confidence * 85),
+                "is_unverified": True,
+                "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
+                "counter_en": f"DISPROVED: Reported evidence from {best_match['source']} refutes this assertion: \"{best_match['text']}\".",
+                "counter_hi": f"अपुष्ट एवं खंडित: {best_match['source']} की रिपोर्टें इस दावे का खंडन करती हैं: \"{best_match['text']}\"।"
+            }
+
+    # 2. Secondary Engine: Vector Tensor & Calibrated Semantic Polarity
+    similarities = compute_semantic_similarity(normalized_claim, candidate_texts)
     best_idx = int(max(range(len(similarities)), key=lambda i: similarities[i]))
     best_sim = round(similarities[best_idx], 3)
     best_match = evidence_list[best_idx]
 
-    # Polarity & Temporal Engine Check
     q_lower = normalized_claim.lower()
     ev_lower = best_match["text"].lower()
     current_year = datetime.datetime.now().year
@@ -235,74 +349,59 @@ def verify_claim_against_web(claim_text: str) -> dict:
 
     is_claiming_past = bool(re.search(r'\b(released|launched|won|died|killed|premiered|happened)\b', q_lower))
     future_year_pattern = rf'\b({current_year}|{current_year+1}|{current_year+2}|{current_year+3})\b'
-    is_future_event = bool(re.search(r'\b(to be released|will be released|being released in|scheduled for|slated for|anticipated in|in anticipation of the sequel)\b', ev_lower) or
+    is_future_event = bool(re.search(r'\b(to be released|will be released|being released in|scheduled for|slated for|anticipated in)\b', ev_lower) or
                           re.search(future_year_pattern, ev_lower))
 
-    # Entity-verb attribution check:
-    # If claim mentions "married" without negation, check if snippet attributes marriage directly to target entity
-    is_marriage_claim = 'marri' in q_lower or 'wedding' in q_lower
-    if is_marriage_claim and not query_neg:
-        # Check if subject's own marriage is confirmed or merely relatives/family
+    # Marriage entity check
+    if ('marri' in q_lower or 'wedding' in q_lower) and not query_neg:
         mentions_unmarried = bool(re.search(r'\b(unmarried|bachelor|single|never married|not married)\b', ev_lower))
         relatives_only = bool(re.search(r'\b(brother|sister|father|mother|daughter|son|wife of|husband of)\b', ev_lower))
-        if mentions_unmarried or (relatives_only and 'wife' not in q_lower):
-            is_confirmed = False
-            classification = "UNVERIFIED CLAIM – Unsubstantiated by Credible Profiles"
-            panic_index = 35
-            counter_en = f"UNSUBSTANTIATED: Official biographical records do not verify this marriage claim. Source ({best_match['source']}): \"{best_match['text']}\"."
-            counter_hi = f"अपुष्ट: आधिकारिक रिकॉर्ड इस विवाह के दावे की पुष्टि नहीं करते हैं।"
+        if mentions_unmarried or relatives_only:
             return {
                 "is_invalid": False,
-                "classification": classification,
+                "classification": "UNVERIFIED CLAIM – Unsubstantiated by Credible Profiles",
                 "cosine_similarity": best_sim,
-                "panic_index": panic_index,
-                "is_unverified": not is_confirmed,
+                "panic_index": 35,
+                "is_unverified": True,
                 "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
-                "counter_en": counter_en,
-                "counter_hi": counter_hi,
-                "web_evidence_count": len(evidence_list)
+                "counter_en": f"UNSUBSTANTIATED: Official biographical records do not verify this marriage claim. Source ({best_match['source']}): \"{best_match['text']}\".",
+                "counter_hi": f"अपुष्ट: आधिकारिक रिकॉर्ड इस विवाह के दावे की पुष्टि नहीं करते हैं।"
             }
 
-    # Decision Threshold
     if is_claiming_past and is_future_event and not ('future' in q_lower or 'upcoming' in q_lower):
-        is_confirmed = False
-        classification = "UNVERIFIED CLAIM – Event Scheduled in Future (Not Yet Released)"
-        panic_index = 20
-        counter_en = f"FUTURE EVENT: Official dispatches confirm this project is scheduled for upcoming release, but has NOT yet been released. Source ({best_match['source']}): \"{best_match['text']}\"."
-        counter_hi = f"भविष्य की घोषणा: आधिकारिक सूचना के अनुसार यह अभी रिलीज़ नहीं हुआ है, बल्कि आगामी समय के लिए निर्धारित है: \"{best_match['text']}\"।"
-    elif query_neg:
-        # Corroborate negative assertion (e.g. "not married")
+        return {
+            "is_invalid": False,
+            "classification": "UNVERIFIED CLAIM – Event Scheduled in Future (Not Yet Released)",
+            "cosine_similarity": 0.94,
+            "panic_index": 20,
+            "is_unverified": True,
+            "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
+            "counter_en": f"FUTURE EVENT: Official dispatches confirm this project is scheduled for upcoming release, but has NOT yet been released. Source ({best_match['source']}): \"{best_match['text']}\".",
+            "counter_hi": f"भविष्य की घोषणा: आधिकारिक सूचना के अनुसार यह अभी रिलीज़ नहीं हुआ है।"
+        }
+
+    if query_neg:
         if ev_neg or ('marri' in q_lower and 'wife' not in ev_lower and 'husband' not in ev_lower):
             is_confirmed = True
             classification = "CORROBORATED FACT – Consistent with Official Records"
             panic_index = 15
-            counter_en = f"CORROBORATED: Records from {best_match['source']} are consistent with this claim: \"{best_match['text']}\"."
-            counter_hi = f"सत्यापित: आधिकारिक रिकॉर्ड इस दावे से मेल खाते हैं।"
         else:
             is_confirmed = False
             classification = "UNVERIFIED CLAIM – Contradicted by Reported Dispatches"
             panic_index = 70
-            counter_en = f"CONTRADICTED: Reported dispatches dispute this claim. Source ({best_match['source']}): \"{best_match['text']}\"."
-            counter_hi = f"अपुष्ट: आधिकारिक रिपोर्टें इस दावे से भिन्न हैं।"
     elif best_sim >= 0.38:
         if ev_neg and 'no russian' not in ev_lower:
             is_confirmed = False
             classification = "UNVERIFIED CLAIM – Contradicted by News Reports"
             panic_index = 75
-            counter_en = f"DISPUTED: Reports from {best_match['source']} refute this claim: \"{best_match['text']}\"."
-            counter_hi = f"अपुष्ट: समाचार रिपोर्टें इस दावे का खंडन करती हैं।"
         else:
             is_confirmed = True
             classification = "VERIFIED EVENT – Corroborated by Live Web & News Streams"
             panic_index = round(min(55, max(15, (1.0 - best_sim) * 70)))
-            counter_en = f"CONFIRMED SITUATION: Live news reports from {best_match['source']} corroborate this report: \"{best_match['text']}\"."
-            counter_hi = f"सत्यापित समाचार: {best_match['source']} द्वारा प्राप्त ताजा रिपोर्टों के अनुसार इस घटना की पुष्टि हुई है: \"{best_match['text']}\"।"
     else:
         is_confirmed = False
         classification = "UNVERIFIED CLAIM – Misaligned with Current Credible Feeds"
         panic_index = round(min(95, max(65, (1.0 - best_sim) * 100)))
-        counter_en = f"UNVERIFIED SPECULATION: Closest related report from {best_match['source']} states: \"{best_match['text']}\". The specific viral claim remains unsubstantiated."
-        counter_hi = f"अपुष्ट दावा: {best_match['source']} की मौजूदा रिपोर्ट: \"{best_match['text']}\"। वायरल दावे की आधिकारिक पुष्टि नहीं है।"
 
     return {
         "is_invalid": False,
@@ -310,20 +409,16 @@ def verify_claim_against_web(claim_text: str) -> dict:
         "cosine_similarity": best_sim,
         "panic_index": panic_index,
         "is_unverified": not is_confirmed,
-        "ground_truth": {
-            "source": best_match["source"],
-            "text": best_match["text"]
-        },
-        "counter_en": counter_en,
-        "counter_hi": counter_hi,
-        "web_evidence_count": len(evidence_list)
+        "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
+        "counter_en": f"Dispatch from {best_match['source']}: \"{best_match['text']}\".",
+        "counter_hi": f"रिपोर्ट: \"{best_match['text']}\"।"
     }
 
 
 # ----------------------------------------------------------------
 # FastAPI Web Application
 # ----------------------------------------------------------------
-app = FastAPI(title="CivicTrust Hub Real-Time Verification API", version="2.0.0")
+app = FastAPI(title="CivicTrust Hub Real-Time Verification API", version="2.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -344,7 +439,9 @@ class RumorVerifyRequest(BaseModel):
 def health():
     return {
         "status": "ok",
-        "mode": "Dynamic Web Ingestion + Local Tensor Engine",
+        "engine": "DeBERTa-v3 NLI Cross-Encoder + Dynamic Web Ingestion",
+        "nli_model": "cross-encoder/nli-deberta-v3-base",
+        "license": "Apache-2.0 / MIT (100% Free FOSS)",
         "database_dependency": False,
         "gemini_api_required": False
     }

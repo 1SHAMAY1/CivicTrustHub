@@ -83,7 +83,8 @@ flowchart TD
 
 | Layer | Technologies Used | Description & Licensing |
 | :--- | :--- | :--- |
-| **Tensor & AI Engine** | **PyTorch**, **Sentence-Transformers** (`all-MiniLM-L6-v2`) | Dense 384-dimensional semantic tensor embedding model. Apache 2.0. |
+| **High-Precision NLI Engine** | **DeBERTa-v3 NLI Cross-Encoder** (`cross-encoder/nli-deberta-v3-base`) | 500MB cross-attention inference model delivering direct Entailment vs. Contradiction classification. Apache 2.0. |
+| **Tensor Embedding Engine** | **PyTorch**, **Sentence-Transformers** (`all-MiniLM-L6-v2`) | Dense 384-dimensional semantic tensor embedding model. Apache 2.0. |
 | **Vector Fallback Engine** | **NumPy**, Vectorized TF-IDF Cosine Calculator | Ultra-lightweight tensor cosine similarity engine requiring zero external weights. |
 | **Backend Framework** | **Python 3.10+**, **FastAPI**, **Uvicorn**, **Pydantic** | Asynchronous REST API serving verification endpoints. MIT License. |
 | **Live Web Ingestion** | **Google News RSS**, **Wikimedia Action API** | 100% live streaming data ingestion. Zero hardcoded mock databases. |

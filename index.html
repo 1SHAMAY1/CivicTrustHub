@@ -171,8 +171,11 @@
         const isNumbersOnly = /^\d+$/.test(cleanNoPunct);
         const isTooShort = rawWords.length < 2 || cleanNoPunct.length < 5;
 
-        // Pure conversational prompt detection (e.g. "tell me about yourself", "how to use this", "you are good")
-        const isConversationalPrompt = /^(tell me about yourself|who are you|how to use this|you are good|what is your name|help me)\b/i.test(cleanNoPunct);
+        // Fuzzy conversational prompt detection (catches typos like 'slef', slang like 'how u doing', leading filler words)
+        const isConversationalPrompt = bool = 
+          /(\btell me\b|\babout your\b|\babout yourself\b|\babout ur\b|\babout slef\b|\bwho are you\b|\bwho r u\b|\bwho is this\b|\bhow to use\b|\byou are good\b|\byou r good\b)/i.test(cleanNoPunct) ||
+          /^(how\s*(r|are|u|you)|what\s*(s|\'s|up|r|is)|who\s*(r|is|u)|sup|wbu)\b/i.test(cleanNoPunct) ||
+          /^(well\s+|so\s+|hey\s+)?(tell\s+me|who\s+are|how\s+to)/i.test(cleanNoPunct);
 
         if (isGreeting || isTooShort || isNumbersOnly || isConversationalPrompt) {
           verdictText.textContent = "Please check rumors only.";
