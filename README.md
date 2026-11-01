@@ -147,31 +147,26 @@ Every dependency, model, and framework utilized in this project is **100% free, 
 
 ## 🚀 Getting Started
 
-### Prerequisites
-- Python 3.10+
-- Pip package manager
+### 1. Instant Access (Live Demo)
+Open `index.html` directly or visit the **[Live GitHub Pages Demo](https://1shamay1.github.io/CivicTrustHub/)**.
 
-### 1. Clone the Repository
+### 2. Local Backend Setup
+**Prerequisites**: Python 3.10+, Pip
+
 ```bash
+# Clone the repository
 git clone https://github.com/1SHAMAY1/CivicTrustHub.git
 cd CivicTrustHub
-```
 
-### 2. Install Dependencies
-```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
-### 3. Run the Backend Server
-```bash
+# Run the live backend server
 uvicorn main:app --reload --port 8000
 ```
-Open your browser at `http://127.0.0.1:8000` to interact with the live engine.
+Open `http://127.0.0.1:8000` in your browser to interact with the full local engine.
 
-### 4. Run Core Tests
+### 3. Run Core Verification Tests
 ```bash
 python -X utf8 -c "import test_core; [getattr(test_core, n)() for n in dir(test_core) if n.startswith('test_')]; print('All core tests passed.')"
 ```
-
-### 5. Static Frontend
-You can also open `index.html` directly or visit the [Live GitHub Pages Demo](https://1shamay1.github.io/CivicTrustHub/).
