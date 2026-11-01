@@ -81,7 +81,8 @@
         <input 
           type="text" 
           id="rumorInput" 
-          placeholder="Search or enter a rumor (e.g. Cyclone alert, school holiday)..." 
+          maxlength="300"
+          placeholder="Search rumor (e.g. Cyclone alert, school holiday, दिल्ली बाढ़)..." 
           class="skeuo-input flex-1 px-6 py-4 rounded-full text-slate-800 placeholder-slate-400 focus:outline-none text-base border-none"
           required
         />
@@ -99,7 +100,7 @@
       </div>
     </form>
 
-    <!-- Loading State (Fixed flex alignment & border) -->
+    <!-- Loading State -->
     <div id="loadingIndicator" class="hidden flex flex-col items-center justify-center space-y-3 py-4">
       <div class="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
       <p class="text-xs uppercase tracking-wider text-slate-500 font-semibold">Corroborating across live sources...</p>
@@ -108,7 +109,7 @@
     <!-- 3-State Verdict Card -->
     <div id="resultBox" class="hidden skeuo-card w-full max-w-md p-6 rounded-3xl text-center transition-all duration-300">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Verification Verdict</span>
+        <span id="engineBadge" class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">DeBERTa NLI</span>
         <span id="confidenceBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200"></span>
       </div>
       
@@ -136,8 +137,13 @@
   <div class="h-6"></div>
 
   <script>
-    // Configurable API base for deployed backends, fallback to same origin or localhost
+    // Configurable API base for deployed backends (e.g. Render / Railway / Hugging Face Spaces)
     const API_BASE = window.API_BASE || (['localhost', '127.0.0.1'].includes(window.location.hostname) ? 'http://127.0.0.1:8000' : '');
+
+    // Robust Unicode text cleaning preserving Indic letters and combining marks
+    function cleanUnicodeText(str) {
+      return str.replace(/’/g, "'").replace(/[^\p{L}\p{N}\s\?']/gu, ' ').trim();
+    }
 
     async function handleSearch(e) {
       e.preventDefault();
@@ -149,6 +155,7 @@
       const resultBox = document.getElementById('resultBox');
       const verdictText = document.getElementById('verdictText');
       const confidenceBadge = document.getElementById('confidenceBadge');
+      const engineBadge = document.getElementById('engineBadge');
       const classificationText = document.getElementById('classificationText');
       const evidenceContainer = document.getElementById('evidenceContainer');
       const evidenceText = document.getElementById('evidenceText');
@@ -165,11 +172,11 @@
 
       try {
         const rawTrim = input.trim();
-        const cleanRaw = rawTrim.toLowerCase().replace(/[^\w\s\?]/g, ' ').trim();
-        const cleanNoPunct = cleanRaw.replace(/\?+/g, '').trim();
+        const cleanRaw = cleanUnicodeText(rawTrim).toLowerCase();
+        const cleanNoPunct = cleanRaw.replace(/\?/g, '').trim();
         const rawWords = cleanNoPunct.split(/\s+/).filter(Boolean);
 
-        // 1. Conversational & Greeting Filter (Unicode-aware, handles typos like 'slef', slang 'how u')
+        // Conversational & Greeting Filter (Unicode-aware, handles typos like 'slef', slang 'how u')
         const commonGreetings = ['hi', 'hello', 'hey', 'test', 'testing', 'good morning', 'good afternoon', 'good evening', 'bye', 'ok', 'okay', 'yes', 'no'];
         const isGreeting = commonGreetings.includes(cleanNoPunct);
         const isNumbersOnly = /^\d+$/.test(cleanNoPunct);
@@ -185,6 +192,7 @@
           verdictText.className = "text-xl sm:text-2xl font-bold text-amber-600 tracking-normal py-2";
           confidenceBadge.textContent = "Invalid Query";
           confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
+          engineBadge.textContent = "Input Sanity Guard";
           classificationText.textContent = "Conversational prompt or non-assertion query detected.";
           resultBox.classList.remove('hidden');
           return;
@@ -199,17 +207,18 @@
 
         let verdict = "UNVERIFIED";
         let classification = "";
+        let engineName = "DeBERTa NLI";
         let confidenceScore = null;
         let evidenceSnippet = "";
         let counterHi = "";
 
-        // 1. Try FastAPI Backend if available
+        // 1. Try FastAPI Backend (25s timeout for model loading on cold starts)
         let backendOk = false;
         const targetUrl = API_BASE ? `${API_BASE}/api/rumors/verify` : '/api/rumors/verify';
 
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000);
+          const timeoutId = setTimeout(() => controller.abort(), 25000);
           const res = await fetch(targetUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -229,8 +238,9 @@
               resultBox.classList.remove('hidden');
               return;
             }
-            verdict = data.verdict || (data.is_unverified ? "UNVERIFIED" : "VERIFIED");
+            verdict = data.verdict || "UNVERIFIED";
             classification = data.classification || "";
+            engineName = data.engine || "DeBERTa NLI Cross-Encoder";
             confidenceScore = data.confidence || null;
             evidenceSnippet = data.ground_truth ? `${data.ground_truth.source}: "${data.ground_truth.text}"` : "";
             counterHi = data.counter_hi || "";
@@ -240,8 +250,9 @@
           backendOk = false;
         }
 
-        // 2. Client-side Real-time Web Evidence Fallback
+        // 2. Client-side Real-time Web Evidence Fallback (Degraded Mode)
         if (!backendOk) {
+          engineName = "Client Web Fallback (Degraded)";
           const qLower = normalizedQuery.toLowerCase();
           const qWords = qLower.split(/\s+/).filter(w => w.length > 2);
 
@@ -274,11 +285,10 @@
               const snippetLower = evidenceSnippet.toLowerCase();
               const currentYear = new Date().getFullYear();
 
-              const queryHasNegation = /\b(not|never|no|n't|unmarried|unreleased|fake|false|hoax|disproved)\b/i.test(qLower);
-              const snippetHasNegation = /\b(not|never|no|n't|unmarried|unreleased|unsubstantiated|fake|false|rumor|denied)\b/i.test(snippetLower);
+              const queryHasNegation = /\b(not|never|no|unmarried|unreleased|fake|false|hoax|disproved)\b|n't\b/i.test(qLower);
+              const snippetHasNegation = /\b(not|never|no|unmarried|unreleased|unsubstantiated|fake|false|rumor|denied)\b|n't\b/i.test(snippetLower);
 
               const isClaimingPastEvent = /\b(released|launched|won|died|killed|premiered|happened)\b/i.test(qLower);
-              // Exclude current year (2026) so present events are not falsely flagged
               const futureYearRegex = new RegExp(`\\b(${currentYear + 1}|${currentYear + 2}|${currentYear + 3})\\b`);
               const isFutureInSnippet = /\b(to be released|will be released|being released in|scheduled for|slated for|anticipated in)\b/i.test(snippetLower) ||
                                         futureYearRegex.test(snippetLower);
@@ -288,7 +298,7 @@
               if (isClaimingPastEvent && isFutureInSnippet && !qLower.includes('future') && !qLower.includes('upcoming')) {
                 verdict = "CONTRADICTED";
                 classification = "CONTRADICTED – Event scheduled for future, not yet occurred.";
-                confidenceScore = 0.90;
+                confidenceScore = null;
                 evidenceSnippet += " (Source clarifies event is an upcoming announcement).";
               } else if (isMarriageClaim && !queryHasNegation) {
                 const mentionsUnmarried = /\b(unmarried|bachelor|single|never married|not married)\b/i.test(snippetLower);
@@ -296,7 +306,7 @@
                 if (mentionsUnmarried || relativesOnly) {
                   verdict = "CONTRADICTED";
                   classification = "CONTRADICTED – Biographical records do not verify this marriage.";
-                  confidenceScore = bestRatio > 0.4 ? Number(bestRatio.toFixed(2)) : null;
+                  confidenceScore = null;
                 } else {
                   verdict = "UNVERIFIED";
                   classification = "UNVERIFIED – Inconclusive marital dispatches.";
@@ -363,6 +373,7 @@
           confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
         }
 
+        engineBadge.textContent = engineName;
         classificationText.textContent = classification;
 
         if (evidenceSnippet) {
@@ -382,6 +393,7 @@
         verdictText.className = "text-2xl sm:text-3xl font-bold text-slate-700 tracking-normal py-1";
         confidenceBadge.textContent = "Execution Error";
         confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200";
+        engineBadge.textContent = "Execution Guard";
         classificationText.textContent = "Temporary execution error occurred while scanning dispatches.";
         evidenceContainer.classList.add('hidden');
         hindiContainer.classList.add('hidden');

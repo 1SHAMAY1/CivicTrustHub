@@ -3,11 +3,10 @@
 #
 # Features:
 #   1. Real-time Live Web & News Ingestion (Zero static mock database)
-#   2. DeBERTa-v3 NLI Cross-Encoder (~500 MB) for Entailment / Contradiction
-#   3. Local Vector / Semantic Similarity Tensor Engine Fallback
-#   4. Zero Gemini / External Closed LLM API required
-#   5. 3-State Factual Verdicts: VERIFIED / CONTRADICTED / UNVERIFIED
-#   6. Full Unicode Support (Hindi & Regional Indian Scripts)
+#   2. DeBERTa-v3 NLI Cross-Encoder (~500 MB) with Thread-safe Startup Preload
+#   3. Strict 3-State Factual Truth Model: VERIFIED / CONTRADICTED / UNVERIFIED
+#   4. Robust Unicode & Combining Mark Support (Hindi, Bengali, Indian Regional Scripts)
+#   5. Temporal Guard & Fact-Check Debunk Detection
 # ==============================================================
 
 from __future__ import annotations
@@ -17,6 +16,8 @@ import json
 import math
 import pathlib
 import datetime
+import threading
+import unicodedata
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -25,7 +26,28 @@ from typing import Optional, List, Dict, Tuple
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# ----------------------------------------------------------------
+# Robust Unicode Preservation (Preserves combining marks in Indic scripts)
+# ----------------------------------------------------------------
+def strip_punctuation(text: str, keep_chars: str = "?'") -> str:
+    """
+    Cleans punctuation while preserving:
+    - All Unicode alphanumeric letters & numbers (Hindi, Bengali, English, etc.)
+    - Unicode combining marks (matras, virama like in 'दिल्ली')
+    - Specified punctuation (like '?' and contractions "'")
+    """
+    normalized = text.replace("’", "'").replace("`", "'")
+    chars = []
+    for c in normalized:
+        cat = unicodedata.category(c)
+        if c.isalnum() or c.isspace() or c in keep_chars or cat.startswith("M"):
+            chars.append(c)
+        else:
+            chars.append(" ")
+    return "".join(chars)
+
 
 # ----------------------------------------------------------------
 # Live Web Ingestion (Adaptive Global & Regional News Feed)
@@ -35,8 +57,7 @@ def fetch_live_web_evidence(query: str, max_results: int = 8) -> Tuple[List[Dict
     Dynamically queries live news feeds & credible web indexes.
     Returns: (evidence_list, error_message_if_any)
     """
-    # Clean query preserving Unicode words (supports Hindi, Bengali, etc.)
-    clean_query = re.sub(r'[^\w\s]', ' ', query, flags=re.UNICODE).strip()
+    clean_query = strip_punctuation(query, keep_chars="").strip()
     encoded_q = urllib.parse.quote(clean_query)
     evidence: List[Dict[str, str]] = []
     network_error: Optional[str] = None
@@ -45,7 +66,7 @@ def fetch_live_web_evidence(query: str, max_results: int = 8) -> Tuple[List[Dict
     news_url = f"https://news.google.com/rss/search?q={encoded_q}&hl=en-IN&gl=IN&ceid=IN:en"
     try:
         req = urllib.request.Request(news_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=6) as response:
             xml_data = response.read()
             root = ET.fromstring(xml_data)
             items = root.findall(".//item")
@@ -69,7 +90,7 @@ def fetch_live_web_evidence(query: str, max_results: int = 8) -> Tuple[List[Dict
         try:
             wiki_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={encoded_q}&format=json"
             req = urllib.request.Request(wiki_url, headers={"User-Agent": "CivicTrustHub/2.0"})
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=6) as response:
                 raw = json.loads(response.read().decode("utf-8"))
                 for r in raw.get("query", {}).get("search", [])[:4]:
                     clean_snippet = re.sub(r'<[^<]+?>', '', r.get("snippet", ""))
@@ -93,30 +114,34 @@ def fetch_live_web_evidence(query: str, max_results: int = 8) -> Tuple[List[Dict
 # ----------------------------------------------------------------
 NLI_MODEL = None
 NLI_TOKENIZER = None
-_NLI_TRIED = False
+_NLI_LOCK = threading.Lock()
+_NLI_LOADED = False
 
 def get_nli_engine():
     """
-    Lazy loads the DeBERTa-v3 NLI Cross-Encoder (~500MB).
-    Flags _NLI_TRIED to prevent re-attempting failed downloads on every request.
+    Thread-safe loader for DeBERTa-v3 NLI Cross-Encoder (~500MB).
     """
-    global NLI_MODEL, NLI_TOKENIZER, _NLI_TRIED
-    if _NLI_TRIED:
+    global NLI_MODEL, NLI_TOKENIZER, _NLI_LOADED
+    if _NLI_LOADED:
         return NLI_MODEL, NLI_TOKENIZER
 
-    _NLI_TRIED = True
-    try:
-        from transformers import AutoTokenizer, AutoModelForSequenceClassification
-        model_name = "cross-encoder/nli-deberta-v3-base"
-        print(f"[NLI Engine] 🔄 Loading DeBERTa-v3 Cross-Encoder: {model_name}...")
-        NLI_TOKENIZER = AutoTokenizer.from_pretrained(model_name)
-        NLI_MODEL = AutoModelForSequenceClassification.from_pretrained(model_name)
-        NLI_MODEL.eval()
-        print("[NLI Engine] ✅ DeBERTa-v3 Cross-Encoder loaded successfully into memory.")
-    except Exception as ex:
-        print(f"[NLI Engine] ⚡ NLI Cross-Encoder running in fallback mode: {ex}")
-        NLI_MODEL = None
-        NLI_TOKENIZER = None
+    with _NLI_LOCK:
+        if _NLI_LOADED:
+            return NLI_MODEL, NLI_TOKENIZER
+        try:
+            from transformers import AutoTokenizer, AutoModelForSequenceClassification
+            model_name = "cross-encoder/nli-deberta-v3-base"
+            print(f"[NLI Engine] 🔄 Loading DeBERTa-v3 Cross-Encoder: {model_name}...")
+            NLI_TOKENIZER = AutoTokenizer.from_pretrained(model_name)
+            NLI_MODEL = AutoModelForSequenceClassification.from_pretrained(model_name)
+            NLI_MODEL.eval()
+            print("[NLI Engine] ✅ DeBERTa-v3 Cross-Encoder loaded successfully into memory.")
+        except Exception as ex:
+            print(f"[NLI Engine] ⚡ NLI Cross-Encoder running in fallback mode: {ex}")
+            NLI_MODEL = None
+            NLI_TOKENIZER = None
+        finally:
+            _NLI_LOADED = True
 
     return NLI_MODEL, NLI_TOKENIZER
 
@@ -157,21 +182,26 @@ def evaluate_nli_entailment(claim: str, evidence_texts: List[str]) -> List[Dict[
 # Local Tensor & TF-IDF Cosine Vector Fallback Engine
 # ----------------------------------------------------------------
 ENCODER_MODEL = None
-_ENCODER_TRIED = False
+_ENCODER_LOCK = threading.Lock()
+_ENCODER_LOADED = False
 
 def get_sentence_transformer():
-    global ENCODER_MODEL, _ENCODER_TRIED
-    if _ENCODER_TRIED:
+    global ENCODER_MODEL, _ENCODER_LOADED
+    if _ENCODER_LOADED:
         return ENCODER_MODEL
 
-    _ENCODER_TRIED = True
-    try:
-        from sentence_transformers import SentenceTransformer
-        ENCODER_MODEL = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-        print("[Local Tensor Engine] ✅ MiniLM Transformer Model loaded successfully.")
-    except Exception as ex:
-        print(f"[Local Tensor Engine] ⚡ SentenceTransformer initializing or fallback mode: {ex}")
-        ENCODER_MODEL = None
+    with _ENCODER_LOCK:
+        if _ENCODER_LOADED:
+            return ENCODER_MODEL
+        try:
+            from sentence_transformers import SentenceTransformer
+            ENCODER_MODEL = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+            print("[Local Tensor Engine] ✅ MiniLM Transformer Model loaded successfully.")
+        except Exception as ex:
+            print(f"[Local Tensor Engine] ⚡ SentenceTransformer initializing or fallback mode: {ex}")
+            ENCODER_MODEL = None
+        finally:
+            _ENCODER_LOADED = True
 
     return ENCODER_MODEL
 
@@ -188,7 +218,6 @@ def compute_semantic_similarity(query: str, candidate_texts: List[str]) -> List[
         except Exception:
             pass
 
-    # Deterministic token cosine vector calculation (Unicode-aware, stopword filtered)
     stopwords = {'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'is', 'was', 'for', 'on', 'with', 'by'}
     words_q = [w for w in re.findall(r'\b\w{2,}\b', query.lower(), flags=re.UNICODE) if w not in stopwords]
     if not words_q:
@@ -211,8 +240,8 @@ def compute_semantic_similarity(query: str, candidate_texts: List[str]) -> List[
 # ----------------------------------------------------------------
 def normalize_and_validate_query(raw_text: str) -> Tuple[Optional[str], Optional[dict]]:
     raw_stripped = raw_text.strip()
-    clean_raw = re.sub(r'[^\w\s\?]', ' ', raw_stripped, flags=re.UNICODE).lower().strip()
-    clean_no_punct = re.sub(r'[\?]+', '', clean_raw).strip()
+    clean_raw = strip_punctuation(raw_stripped, keep_chars="?'").lower().strip()
+    clean_no_punct = clean_raw.replace("?", "").strip()
     raw_words = [w for w in clean_no_punct.split() if w]
 
     common_greetings = {
@@ -233,7 +262,6 @@ def normalize_and_validate_query(raw_text: str) -> Tuple[Optional[str], Optional
             "counter_hi": "कृपया जांच के लिए कोई विशिष्ट दावा या अफवाह दर्ज करें।"
         }
 
-    # Catch conversational prompts, slang, and typo variants (e.g. "tell me about your slef", "how u doing")
     is_conversational = bool(
         re.search(r'(\btell me\b|\babout your\b|\babout yourself\b|\babout ur\b|\babout slef\b|\bwho are you\b|\bwho r u\b|\bwho is this\b|\bhow to use\b|\byou are good\b|\byou r good\b)', clean_no_punct) or
         re.search(r'^(how\s*(r|are|u|you)|what\s*(s|\'s|up|r|is)|who\s*(r|is|u)|sup|wbu)\b', clean_no_punct)
@@ -253,7 +281,7 @@ def normalize_and_validate_query(raw_text: str) -> Tuple[Optional[str], Optional
             "counter_hi": "कृपया जांच के लिए कोई विशिष्ट दावा या अफवाह दर्ज करें।"
         }
 
-    # Only strip leading auxiliary if the sentence ends with a question mark (preserves "Will Smith")
+    # Only strip leading auxiliary if the sentence ends with '?' (preserves "Will Smith")
     ends_with_q = raw_stripped.endswith('?')
     if ends_with_q:
         normalized = re.sub(r'^(is|are|was|were|did|does|will|can|has|have)\s+', '', clean_no_punct, flags=re.IGNORECASE).strip()
@@ -279,6 +307,7 @@ def verify_claim_against_web(claim_text: str) -> dict:
             return {
                 "is_invalid": False,
                 "verdict": "NETWORK_ERROR",
+                "engine": "Offline Ingestion Stream",
                 "classification": "SERVICE TEMPORARILY UNAVAILABLE",
                 "confidence": None,
                 "ground_truth": {
@@ -291,6 +320,7 @@ def verify_claim_against_web(claim_text: str) -> dict:
         return {
             "is_invalid": False,
             "verdict": "UNVERIFIED",
+            "engine": "Live Web Ingestion",
             "classification": "UNVERIFIED CLAIM – Zero Credible News Confirmation",
             "confidence": None,
             "ground_truth": {
@@ -302,6 +332,28 @@ def verify_claim_against_web(claim_text: str) -> dict:
         }
 
     candidate_texts = [e["text"] for e in evidence_list]
+    current_year = datetime.datetime.now().year
+    q_lower = normalized_claim.lower()
+
+    # Pre-check Temporal Guard: Is user asserting past completion for an announced future event?
+    is_claiming_past = bool(re.search(r'\b(released|launched|won|died|killed|premiered|happened)\b', q_lower))
+    future_year_pattern = rf'\b({current_year+1}|{current_year+2}|{current_year+3})\b'
+
+    for e in evidence_list:
+        ev_lower = e["text"].lower()
+        is_future = bool(re.search(r'\b(to be released|will be released|being released in|scheduled for|slated for|anticipated in)\b', ev_lower) or
+                         re.search(future_year_pattern, ev_lower))
+        if is_claiming_past and is_future and not ('future' in q_lower or 'upcoming' in q_lower):
+            return {
+                "is_invalid": False,
+                "verdict": "CONTRADICTED",
+                "engine": "Temporal Guard",
+                "classification": "CONTRADICTED – Event Scheduled in Future (Not Yet Occurred)",
+                "confidence": None,
+                "ground_truth": {"source": e["source"], "text": e["text"]},
+                "counter_en": f"FUTURE EVENT: Official dispatches confirm this project is scheduled for upcoming release, but has NOT yet occurred. Source ({e['source']}): \"{e['text']}\".",
+                "counter_hi": f"भविष्य की घोषणा: आधिकारिक सूचना के अनुसार यह अभी रिलीज़ नहीं हुआ है।"
+            }
 
     # 1. Primary Engine: DeBERTa NLI Cross-Encoder
     nli_results = evaluate_nli_entailment(normalized_claim, candidate_texts)
@@ -322,12 +374,29 @@ def verify_claim_against_web(claim_text: str) -> dict:
 
         best_match = evidence_list[best_signal_idx]
         best_res = nli_results[best_signal_idx]
+        ev_best_lower = best_match["text"].lower()
+
+        # Check for debunk / fact-check headlines (which NLI might naively score as entailment)
+        is_debunk_headline = bool(re.search(r'\b(fact.?check|debunk|hoax|fake|misleading|false claim|denied)\b', ev_best_lower))
+
+        if is_debunk_headline:
+            return {
+                "is_invalid": False,
+                "verdict": "CONTRADICTED",
+                "engine": "DeBERTa-v3 NLI + Debunk Detector",
+                "classification": "CONTRADICTED – Debunked as False by Fact-Checking Desks",
+                "confidence": round(best_res["contradiction"], 2) if best_res["contradiction"] > 0.4 else None,
+                "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
+                "counter_en": f"DEBUNKED: Official fact-checkers report this claim is false: \"{best_match['text']}\".",
+                "counter_hi": f"फर्जी दावा: आधिकारिक फैक्ट-चेकर्स ने इस दावे का खंडन किया है: \"{best_match['text']}\"।"
+            }
 
         if best_verdict_type == "entailment" and best_res["entailment"] >= 0.60:
             confidence = round(best_res["entailment"], 2)
             return {
                 "is_invalid": False,
                 "verdict": "VERIFIED",
+                "engine": "DeBERTa-v3 NLI Cross-Encoder",
                 "classification": "VERIFIED EVENT – Corroborated via Cross-Attention Inference",
                 "confidence": confidence,
                 "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
@@ -339,34 +408,39 @@ def verify_claim_against_web(claim_text: str) -> dict:
             return {
                 "is_invalid": False,
                 "verdict": "CONTRADICTED",
+                "engine": "DeBERTa-v3 NLI Cross-Encoder",
                 "classification": "CONTRADICTED / REFUTED – Disproved by Reported Dispatches",
                 "confidence": confidence,
                 "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
                 "counter_en": f"DISPROVED: Reported evidence from {best_match['source']} refutes this assertion: \"{best_match['text']}\".",
                 "counter_hi": f"अपुष्ट एवं खंडित: {best_match['source']} की रिपोर्टें इस दावे का खंडन करती हैं: \"{best_match['text']}\"।"
             }
+        else:
+            # NLI ran and determined evidence is Neutral / Inconclusive. STOP HERE!
+            # Never fall back to cosine similarity when NLI is active.
+            return {
+                "is_invalid": False,
+                "verdict": "UNVERIFIED",
+                "engine": "DeBERTa-v3 NLI Cross-Encoder",
+                "classification": "UNVERIFIED CLAIM – Inconclusive or Neutral Evidence",
+                "confidence": None,
+                "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
+                "counter_en": f"INCONCLUSIVE: Available dispatches mention related topics but do not formally confirm this rumor: \"{best_match['text']}\".",
+                "counter_hi": f"अपुष्ट: उपलब्ध समाचारों में इस दावे की आधिकारिक पुष्टि नहीं मिली है।"
+            }
 
-    # 2. Secondary Engine: Semantic Similarity & Polarity/Temporal Alignment
+    # 2. Secondary Engine: Vector Tensor Fallback (ONLY runs if NLI weights are unavailable)
     similarities = compute_semantic_similarity(normalized_claim, candidate_texts)
     best_idx = int(max(range(len(similarities)), key=lambda i: similarities[i]))
     best_sim = round(similarities[best_idx], 3)
     best_match = evidence_list[best_idx]
-
-    q_lower = normalized_claim.lower()
     ev_lower = best_match["text"].lower()
-    current_year = datetime.datetime.now().year
 
-    # Check negations preserving contractions
-    query_neg = bool(re.search(r"\b(not|never|no|n't|unmarried|unreleased|fake|false|hoax|disproved)\b", q_lower))
-    ev_neg = bool(re.search(r"\b(not|never|no|n't|unmarried|unreleased|unsubstantiated|fake|false|rumor|denied)\b", ev_lower))
+    # Contraction-aware negation check
+    query_neg = bool(re.search(r"\b(not|never|no|unmarried|unreleased|fake|false|hoax|disproved)\b|n't\b", q_lower))
+    ev_neg = bool(re.search(r"\b(not|never|no|unmarried|unreleased|unsubstantiated|fake|false|rumor|denied)\b|n't\b", ev_lower))
 
-    is_claiming_past = bool(re.search(r'\b(released|launched|won|died|killed|premiered|happened)\b', q_lower))
-    # Exclude current year (2026) so present events aren't marked future
-    future_year_pattern = rf'\b({current_year+1}|{current_year+2}|{current_year+3})\b'
-    is_future_event = bool(re.search(r'\b(to be released|will be released|being released in|scheduled for|slated for|anticipated in)\b', ev_lower) or
-                          re.search(future_year_pattern, ev_lower))
-
-    # Marriage entity check (avoid Marriott false matches)
+    # Marriage entity check (exact word boundaries, avoids Marriott)
     is_marriage_claim = bool(re.search(r'\bmarri(ed|age)\b|\bwedding\b', q_lower))
     if is_marriage_claim and not query_neg:
         mentions_unmarried = bool(re.search(r'\b(unmarried|bachelor|single|never married|not married)\b', ev_lower))
@@ -375,25 +449,14 @@ def verify_claim_against_web(claim_text: str) -> dict:
             return {
                 "is_invalid": False,
                 "verdict": "CONTRADICTED",
+                "engine": "Semantic Fallback + Entity Attribution",
                 "classification": "CONTRADICTED – Unsubstantiated by Credible Profiles",
-                "confidence": best_sim if best_sim > 0.4 else None,
+                "confidence": None,
                 "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
                 "counter_en": f"UNSUBSTANTIATED: Official biographical records do not verify this marriage claim. Source ({best_match['source']}): \"{best_match['text']}\".",
                 "counter_hi": f"अपुष्ट: आधिकारिक रिकॉर्ड इस विवाह के दावे की पुष्टि नहीं करते हैं।"
             }
 
-    if is_claiming_past and is_future_event and not ('future' in q_lower or 'upcoming' in q_lower):
-        return {
-            "is_invalid": False,
-            "verdict": "CONTRADICTED",
-            "classification": "CONTRADICTED – Event Scheduled in Future (Not Yet Occurred)",
-            "confidence": 0.90,
-            "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
-            "counter_en": f"FUTURE EVENT: Official dispatches confirm this project is scheduled for upcoming release, but has NOT yet occurred. Source ({best_match['source']}): \"{best_match['text']}\".",
-            "counter_hi": f"भविष्य की घोषणा: आधिकारिक सूचना के अनुसार यह अभी रिलीज़ नहीं हुआ है।"
-        }
-
-    # Similarity gating: only evaluate polarity if similarity threshold is met
     if best_sim >= 0.45:
         if query_neg:
             if ev_neg or (is_marriage_claim and 'wife' not in ev_lower and 'husband' not in ev_lower):
@@ -418,6 +481,7 @@ def verify_claim_against_web(claim_text: str) -> dict:
     return {
         "is_invalid": False,
         "verdict": verdict,
+        "engine": "Semantic Vector Tensor Fallback",
         "classification": classification,
         "confidence": confidence,
         "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
@@ -427,9 +491,9 @@ def verify_claim_against_web(claim_text: str) -> dict:
 
 
 # ----------------------------------------------------------------
-# FastAPI Web Application (Secure Setup)
+# FastAPI Web Application (Secure Setup with Startup Preload)
 # ----------------------------------------------------------------
-app = FastAPI(title="CivicTrust Hub Real-Time Verification API", version="2.2.0")
+app = FastAPI(title="CivicTrust Hub Real-Time Verification API", version="2.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -441,8 +505,14 @@ app.add_middleware(
 
 ROOT_DIR = pathlib.Path(__file__).parent
 
+@app.on_event("startup")
+def startup_preload_models():
+    """Preload models in a background thread so the server starts immediately and warm-ups inference."""
+    threading.Thread(target=get_nli_engine, daemon=True).start()
+    threading.Thread(target=get_sentence_transformer, daemon=True).start()
+
 class RumorVerifyRequest(BaseModel):
-    text: str
+    text: str = Field(..., max_length=300)
     platform: Optional[str] = "Live Feed"
 
 @app.get("/api/health")
