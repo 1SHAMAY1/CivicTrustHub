@@ -14,6 +14,7 @@ import html
 import json
 import math
 import pathlib
+import datetime
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -26,7 +27,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 # ----------------------------------------------------------------
-# Live Web Ingestion (Google News RSS + Global Knowledge Query)
+# Live Web Ingestion (Adaptive Global & Regional News Feed)
 # ----------------------------------------------------------------
 def fetch_live_web_evidence(query: str, max_results: int = 8) -> List[Dict[str, str]]:
     """
@@ -37,11 +38,11 @@ def fetch_live_web_evidence(query: str, max_results: int = 8) -> List[Dict[str, 
     encoded_q = urllib.parse.quote(clean_query)
     evidence: List[Dict[str, str]] = []
 
-    # 1. Google News Live Search Feed
-    news_url = f"https://news.google.com/rss/search?q={encoded_q}&hl=en-IN&gl=IN&ceid=IN:en"
+    # 1. Google News Live Search Feed (Clean global query without hardcoded geo restriction)
+    news_url = f"https://news.google.com/rss/search?q={encoded_q}&hl=en&gl=US&ceid=US:en"
     try:
-        req = urllib.request.Request(news_url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
-        with urllib.request.urlopen(req, timeout=4) as response:
+        req = urllib.request.Request(news_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with urllib.request.urlopen(req, timeout=5) as response:
             xml_data = response.read()
             root = ET.fromstring(xml_data)
             items = root.findall(".//item")
@@ -50,7 +51,6 @@ def fetch_live_web_evidence(query: str, max_results: int = 8) -> List[Dict[str, 
                 source_tag = item.find("source")
                 source = source_tag.text if source_tag is not None else "Verified News Network"
                 if title:
-                    # Clean source name from title if duplicated (e.g., "... - BBC")
                     clean_title = re.sub(r' - [^-]+$', '', title).strip()
                     evidence.append({
                         "source": source,
@@ -60,14 +60,14 @@ def fetch_live_web_evidence(query: str, max_results: int = 8) -> List[Dict[str, 
     except Exception as e:
         print(f"[Web Scraper] News RSS fetch notice: {e}")
 
-    # 2. Wikipedia Live Fact Index (Emergency/Event history fallback)
+    # 2. Wikipedia Live Fact Index (Emergency/Event history & encyclopedic check)
     if len(evidence) < 3:
         try:
             wiki_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={encoded_q}&format=json"
             req = urllib.request.Request(wiki_url, headers={"User-Agent": "CivicTrustHub/2.0"})
-            with urllib.request.urlopen(req, timeout=4) as response:
+            with urllib.request.urlopen(req, timeout=5) as response:
                 raw = json.loads(response.read().decode("utf-8"))
-                for r in raw.get("query", {}).get("search", [])[:3]:
+                for r in raw.get("query", {}).get("search", [])[:4]:
                     clean_snippet = re.sub(r'<[^<]+?>', '', r.get("snippet", ""))
                     clean_snippet = html.unescape(clean_snippet).strip()
                     if clean_snippet:
@@ -93,7 +93,6 @@ def get_sentence_transformer():
         return ENCODER_MODEL
     try:
         from sentence_transformers import SentenceTransformer
-        # Check local path or lightweight HuggingFace cache
         ENCODER_MODEL = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         print("[Local Tensor Engine] ✅ MiniLM Transformer Model loaded successfully.")
     except Exception as ex:
@@ -126,36 +125,33 @@ def compute_semantic_similarity(query: str, candidate_texts: List[str]) -> List[
         set_c = set(words_c)
         matches = sum(1 for w in words_q if w in set_c)
         
-        # Calculate Term Jaccard / Cosine approximation
         denominator = math.sqrt(len(words_q) * max(len(set_c), 1))
         score = (matches / denominator) if denominator > 0 else 0.0
-        # Normalize into 0.10 - 0.95 range
         sims.append(min(0.95, max(0.10, score * 1.5)))
 
     return sims
 
 
 # ----------------------------------------------------------------
-# Real-Time Fact Verification & Regional Card Synthesizer
+# Query Normalization & Input Validation
 # ----------------------------------------------------------------
-def verify_claim_against_web(claim_text: str) -> dict:
-    # 0. Edge-case sanitization & non-rumor filtering
-    clean_raw = re.sub(r'[^a-zA-Z0-9\s]', ' ', claim_text).lower().strip()
-    raw_words = [w for w in clean_raw.split() if w]
+def normalize_and_validate_query(raw_text: str) -> tuple[Optional[str], Optional[dict]]:
+    """
+    Distinguishes pure conversational chitchat from legitimate citizen rumor queries.
+    Strips leading interrogative auxiliaries (e.g. 'Is [claim]?', 'Was [claim]?')
+    into verifiable declarative claims instead of rejecting them.
+    """
+    clean_raw = re.sub(r'[^a-zA-Z0-9\s\?]', ' ', raw_text).lower().strip()
+    clean_no_punct = re.sub(r'[\?]+', '', clean_raw).strip()
+    raw_words = [w for w in clean_no_punct.split() if w]
+
     common_greetings = {
         'hi', 'hello', 'hey', 'test', 'testing', 'good morning', 'good afternoon', 'good evening', 'bye', 'ok', 'okay', 'yes', 'no'
     }
 
-    is_greeting = clean_raw in common_greetings
-    is_too_short = len(raw_words) < 2 or len(clean_raw) < 5
-    is_numbers_only = clean_raw.isdigit()
-    is_question_or_prompt = bool(re.search(r'^(how\b|what\b|who\b|why\b|where\b|when\b|can\b|could\b|is\b|are\b|tell\b|give\b|explain\b|show\b|help\b|well\b)', clean_raw) or
-                                re.search(r'^(you are|you\'re|you be)\b', clean_raw) or
-                                re.search(r'(\btell me\b|\bhow to\b|\bwho are you\b|\bwho is this\b|\babout your\b|\babout yourself\b)', clean_raw) or
-                                claim_text.strip().endswith('?'))
-
-    if is_greeting or is_too_short or is_numbers_only or is_question_or_prompt:
-        return {
+    # Reject empty, single words, pure numbers, or trivial greetings
+    if clean_no_punct in common_greetings or len(raw_words) < 2 or len(clean_no_punct) < 5 or clean_no_punct.isdigit():
+        return None, {
             "is_invalid": True,
             "classification": "INVALID QUERY",
             "message": "Please check rumors only.",
@@ -164,16 +160,48 @@ def verify_claim_against_web(claim_text: str) -> dict:
             "panic_index": 0,
             "ground_truth": {
                 "source": "Input Sanity Filter",
-                "text": "Query is conversational or interrogative. It does not contain an assertive claim or rumor to corroborate."
+                "text": "Query does not contain an assertive claim or rumor to corroborate."
             },
-            "counter_en": "Please enter an assertive claim or rumor to check (e.g., 'Schools closed tomorrow in Delhi due to flood').",
+            "counter_en": "Please enter an assertive claim or rumor to check (e.g., 'Schools closed tomorrow due to flood').",
             "counter_hi": "कृपया जांच के लिए कोई विशिष्ट दावा या अफवाह दर्ज करें।"
         }
 
-    evidence_list = fetch_live_web_evidence(claim_text, max_results=8)
+    # Reject purely meta / 2nd-person chat prompts
+    is_meta_chat = bool(re.search(r'^(tell me about yourself|who are you|how to use this|you are good|what is your name|help me)\b', clean_no_punct))
+    if is_meta_chat:
+        return None, {
+            "is_invalid": True,
+            "classification": "INVALID QUERY",
+            "message": "Please check rumors only.",
+            "cosine_similarity": 0.0,
+            "is_unverified": True,
+            "panic_index": 0,
+            "ground_truth": {
+                "source": "Input Sanity Filter",
+                "text": "Conversational prompt detected. Please submit a news claim or viral rumor to verify."
+            },
+            "counter_en": "Please enter an assertive rumor or news claim to check.",
+            "counter_hi": "कृपया जांच के लिए कोई विशिष्ट दावा या अफवाह दर्ज करें।"
+        }
+
+    # Normalize citizen inquiry: e.g. "Is Delhi airport flooded?" -> "Delhi airport flooded"
+    normalized = re.sub(r'^(is\b|are\b|was\b|were\b|did\b|does\b|will\b|can\b|has\b|have\b)\s+', '', clean_no_punct, flags=re.IGNORECASE)
+    normalized = re.sub(r'\s*\?+$', '', normalized).strip()
+
+    return normalized if normalized else clean_no_punct, None
+
+
+# ----------------------------------------------------------------
+# Real-Time Fact Verification & Regional Card Synthesizer
+# ----------------------------------------------------------------
+def verify_claim_against_web(claim_text: str) -> dict:
+    normalized_claim, invalid_resp = normalize_and_validate_query(claim_text)
+    if invalid_resp:
+        return invalid_resp
+
+    evidence_list = fetch_live_web_evidence(normalized_claim, max_results=8)
 
     if not evidence_list:
-        # No credible records found anywhere on the internet
         return {
             "is_invalid": False,
             "classification": "UNVERIFIED RUMOR – Zero Credible News Confirmation",
@@ -190,7 +218,7 @@ def verify_claim_against_web(claim_text: str) -> dict:
 
     # Run semantic tensor comparison
     candidate_texts = [e["text"] for e in evidence_list]
-    similarities = compute_semantic_similarity(claim_text, candidate_texts)
+    similarities = compute_semantic_similarity(normalized_claim, candidate_texts)
 
     # Find highest matching report
     best_idx = int(max(range(len(similarities)), key=lambda i: similarities[i]))
@@ -198,26 +226,53 @@ def verify_claim_against_web(claim_text: str) -> dict:
     best_match = evidence_list[best_idx]
 
     # Polarity & Temporal Engine Check
-    q_lower = claim_text.lower()
+    q_lower = normalized_claim.lower()
     ev_lower = best_match["text"].lower()
+    current_year = datetime.datetime.now().year
 
     query_neg = bool(re.search(r'\b(not|never|no|n\'t|unmarried|unreleased|fake|false|hoax|disproved)\b', q_lower))
     ev_neg = bool(re.search(r'\b(not|never|no|n\'t|unmarried|unreleased|unsubstantiated|fake|false|rumor|denied)\b', ev_lower))
 
     is_claiming_past = bool(re.search(r'\b(released|launched|won|died|killed|premiered|happened)\b', q_lower))
+    future_year_pattern = rf'\b({current_year}|{current_year+1}|{current_year+2}|{current_year+3})\b'
     is_future_event = bool(re.search(r'\b(to be released|will be released|being released in|scheduled for|slated for|anticipated in|in anticipation of the sequel)\b', ev_lower) or
-                          re.search(r'\b(202[6-9]|203[0-9])\b', ev_lower))
+                          re.search(future_year_pattern, ev_lower))
+
+    # Entity-verb attribution check:
+    # If claim mentions "married" without negation, check if snippet attributes marriage directly to target entity
+    is_marriage_claim = 'marri' in q_lower or 'wedding' in q_lower
+    if is_marriage_claim and not query_neg:
+        # Check if subject's own marriage is confirmed or merely relatives/family
+        mentions_unmarried = bool(re.search(r'\b(unmarried|bachelor|single|never married|not married)\b', ev_lower))
+        relatives_only = bool(re.search(r'\b(brother|sister|father|mother|daughter|son|wife of|husband of)\b', ev_lower))
+        if mentions_unmarried or (relatives_only and 'wife' not in q_lower):
+            is_confirmed = False
+            classification = "UNVERIFIED CLAIM – Unsubstantiated by Credible Profiles"
+            panic_index = 35
+            counter_en = f"UNSUBSTANTIATED: Official biographical records do not verify this marriage claim. Source ({best_match['source']}): \"{best_match['text']}\"."
+            counter_hi = f"अपुष्ट: आधिकारिक रिकॉर्ड इस विवाह के दावे की पुष्टि नहीं करते हैं।"
+            return {
+                "is_invalid": False,
+                "classification": classification,
+                "cosine_similarity": best_sim,
+                "panic_index": panic_index,
+                "is_unverified": not is_confirmed,
+                "ground_truth": {"source": best_match["source"], "text": best_match["text"]},
+                "counter_en": counter_en,
+                "counter_hi": counter_hi,
+                "web_evidence_count": len(evidence_list)
+            }
 
     # Decision Threshold
     if is_claiming_past and is_future_event and not ('future' in q_lower or 'upcoming' in q_lower):
-        # Event is unreleased / future
         is_confirmed = False
         classification = "UNVERIFIED CLAIM – Event Scheduled in Future (Not Yet Released)"
         panic_index = 20
         counter_en = f"FUTURE EVENT: Official dispatches confirm this project is scheduled for upcoming release, but has NOT yet been released. Source ({best_match['source']}): \"{best_match['text']}\"."
         counter_hi = f"भविष्य की घोषणा: आधिकारिक सूचना के अनुसार यह अभी रिलीज़ नहीं हुआ है, बल्कि आगामी समय के लिए निर्धारित है: \"{best_match['text']}\"।"
     elif query_neg:
-        if ev_neg or ('married' in q_lower and 'wife' not in ev_lower and 'husband' not in ev_lower):
+        # Corroborate negative assertion (e.g. "not married")
+        if ev_neg or ('marri' in q_lower and 'wife' not in ev_lower and 'husband' not in ev_lower):
             is_confirmed = True
             classification = "CORROBORATED FACT – Consistent with Official Records"
             panic_index = 15

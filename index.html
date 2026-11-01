@@ -160,22 +160,21 @@
       submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
 
       try {
-        const cleanRaw = input.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
-        const rawWords = cleanRaw.split(/\s+/).filter(Boolean);
+        const rawTrim = input.trim();
+        const cleanRaw = rawTrim.toLowerCase().replace(/[^a-z0-9\s\?]/g, ' ').trim();
+        const cleanNoPunct = cleanRaw.replace(/\?+/g, '').trim();
+        const rawWords = cleanNoPunct.split(/\s+/).filter(Boolean);
 
-        // 1. Layer 1: Conversational, Question & Non-Assertion Guard
+        // 1. Layer 1: Strict Conversational vs. Valid Claim Normalizer
         const commonGreetings = ['hi', 'hello', 'hey', 'test', 'testing', 'good morning', 'good afternoon', 'good evening', 'bye', 'ok', 'okay', 'yes', 'no'];
-        const isGreeting = commonGreetings.includes(cleanRaw);
-        const isNumbersOnly = /^\d+$/.test(cleanRaw);
-        const isTooShort = rawWords.length < 2 || cleanRaw.length < 5;
+        const isGreeting = commonGreetings.includes(cleanNoPunct);
+        const isNumbersOnly = /^\d+$/.test(cleanNoPunct);
+        const isTooShort = rawWords.length < 2 || cleanNoPunct.length < 5;
 
-        // Detect questions, commands, conversational prompts
-        const isQuestionOrPrompt = /^(how\b|what\b|who\b|why\b|where\b|when\b|can\b|could\b|is\b|are\b|tell\b|give\b|explain\b|show\b|help\b|well\b)/i.test(cleanRaw) ||
-                                  /^(you are|you're|you be)\b/i.test(cleanRaw) ||
-                                  /(\btell me\b|\bhow to\b|\bwho are you\b|\bwho is this\b|\babout your\b|\babout yourself\b)/i.test(cleanRaw) ||
-                                  input.trim().endsWith('?');
+        // Pure conversational prompt detection (e.g. "tell me about yourself", "how to use this", "you are good")
+        const isConversationalPrompt = /^(tell me about yourself|who are you|how to use this|you are good|what is your name|help me)\b/i.test(cleanNoPunct);
 
-        if (isGreeting || isTooShort || isNumbersOnly || isQuestionOrPrompt) {
+        if (isGreeting || isTooShort || isNumbersOnly || isConversationalPrompt) {
           verdictText.textContent = "Please check rumors only.";
           verdictText.className = "text-xl sm:text-2xl font-bold text-amber-600 tracking-normal py-2";
           confidenceBadge.textContent = "Invalid Query";
@@ -184,17 +183,24 @@
           return;
         }
 
+        // Normalize citizen query: Strip leading interrogative auxiliaries (e.g. "Is Delhi flooded?" -> "Delhi flooded")
+        let normalizedQuery = cleanNoPunct.replace(/^(is|are|was|were|did|does|will|can|has|have)\s+/i, '').trim();
+        if (!normalizedQuery) normalizedQuery = cleanNoPunct;
+
         let isTrue = false;
         let confidenceScore = 0.85;
         let evidenceSnippet = '';
 
-        // 1. Try local FastAPI backend ONLY if running on localhost / 127.0.0.1
-        // (Prevents browser Private Network Access security prompts on GitHub Pages)
+        // 1. Try FastAPI backend dynamically
         let backendOk = false;
         const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-        if (isLocalDev) {
+        const backendUrl = isLocalDev 
+          ? (window.location.origin.startsWith('http') ? `${window.location.origin}/api/rumors/verify` : 'http://127.0.0.1:8000/api/rumors/verify')
+          : null;
+
+        if (backendUrl) {
           try {
-            const res = await fetch('http://127.0.0.1:8000/api/rumors/verify', {
+            const res = await fetch(backendUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ text: input })
@@ -221,21 +227,14 @@
 
         // 2. Client-side real-time evidence fallback (Works on GitHub Pages)
         if (!backendOk) {
-          const clean = input.replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
-          const qLower = clean.toLowerCase();
+          const qLower = normalizedQuery.toLowerCase();
           const qWords = qLower.split(/\s+/).filter(w => w.length > 2);
 
           // Intent Detection:
-          // A. Crisis & Disasters
           const isCrisis = /flood|cyclone|earthquake|storm|dam|rain|fire|accident|landslide|tsunami|outage|epidemic|hospital|evacuate/.test(qLower);
-          
-          // B. Release & Media Events (Movies, Albums, Games, Tech, Books)
           const isReleaseOrEvent = /release|released|launch|launched|published|premier|premiere|premiered|screened|won|winner|elected|declared|death|died|killed|massacre|mission/.test(qLower);
 
-          // C. Personal Gossip (Unverified marriage/divorce rumors)
-          const isGossipQuery = /(marry|married|dating|affair|husband|wife|secret|wedding)/.test(qLower);
-
-          const wikiUrl = `https://en.wikipedia.org/w/api.php?origin=*&action=query&list=search&srsearch=${encodeURIComponent(clean)}&format=json&utf8=1`;
+          const wikiUrl = `https://en.wikipedia.org/w/api.php?origin=*&action=query&list=search&srsearch=${encodeURIComponent(normalizedQuery)}&format=json&utf8=1`;
           const res = await fetch(wikiUrl);
           if (res.ok) {
             const data = await res.json();
@@ -262,28 +261,40 @@
 
             // Layer 2 & 3: Polarity & Temporal Engine
             const snippetLower = evidenceSnippet.toLowerCase();
+            const currentYear = new Date().getFullYear();
 
             // Negation check in query vs snippet
             const queryHasNegation = /\b(not|never|no|n't|unmarried|unreleased|fake|false|hoax|disproved)\b/i.test(qLower);
             const snippetHasNegation = /\b(not|never|no|n't|unmarried|unreleased|unsubstantiated|fake|false|rumor|denied)\b/i.test(snippetLower);
 
-            // Temporal future-tense check (e.g., "to be released in 2026", "scheduled for")
+            // Temporal future-tense check dynamically with current year
             const isClaimingPastEvent = /\b(released|launched|won|died|killed|premiered|happened)\b/i.test(qLower);
+            const futureYearRegex = new RegExp(`\\b(${currentYear}|${currentYear + 1}|${currentYear + 2})\\b`);
             const isFutureInSnippet = /\b(to be released|will be released|being released in|scheduled for|slated for|anticipated in|in anticipation of the sequel)\b/i.test(snippetLower) ||
-                                      /\b(202[6-9]|203[0-9])\b/.test(snippetLower);
+                                      futureYearRegex.test(snippetLower);
+
+            // Marriage verification check: ensure marriage isn't merely attributed to siblings/parents
+            const isMarriageClaim = /marri|wedding/i.test(qLower);
 
             if (isClaimingPastEvent && isFutureInSnippet && !qLower.includes('future') && !qLower.includes('upcoming')) {
-              // Claim asserts event already happened, but official source states it is future/upcoming
               isTrue = false;
               confidenceScore = 0.94;
               if (evidenceSnippet) {
                 evidenceSnippet = `${evidenceSnippet} (Note: Source confirms this is an upcoming/unreleased project, not yet released).`;
               }
+            } else if (isMarriageClaim && !queryHasNegation) {
+              const mentionsUnmarried = /\b(unmarried|bachelor|single|never married|not married)\b/i.test(snippetLower);
+              const relativesOnly = /\b(brother|sister|father|mother|daughter|son|wife of|husband of)\b/i.test(snippetLower);
+              if (mentionsUnmarried || (relativesOnly && !snippetLower.includes('wife of ' + qWords[0]))) {
+                isTrue = false;
+                confidenceScore = 0.86;
+              } else {
+                isTrue = false;
+                confidenceScore = 0.80;
+              }
             } else if (bestRatio >= 0.40) {
-              // Evaluate polarity alignment
               if (queryHasNegation) {
-                // If user claims "X not married" and snippet does not confirm marriage or says unmarried -> TRUE
-                if (snippetHasNegation || !snippetLower.includes('wife') && !snippetLower.includes('husband') && !snippetLower.includes('married to')) {
+                if (snippetHasNegation || (!snippetLower.includes('wife') && !snippetLower.includes('husband'))) {
                   isTrue = true;
                   confidenceScore = Math.min(0.92, 0.72 + bestRatio * 0.2);
                 } else {
@@ -291,7 +302,6 @@
                   confidenceScore = 0.85;
                 }
               } else {
-                // Affirmative claim: check if snippet contradicts or validates
                 if (snippetHasNegation && !snippetLower.includes('no russian')) {
                   isTrue = false;
                   confidenceScore = 0.88;
