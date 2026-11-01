@@ -129,7 +129,7 @@
   <div class="h-6"></div>
 
   <script>
-    function handleSearch(e) {
+    async function handleSearch(e) {
       e.preventDefault();
       
       const input = document.getElementById('rumorInput').value.trim();
@@ -146,13 +146,67 @@
       submitBtn.disabled = true;
       submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
 
-      // Verification delay (Backend team plugs their API call here)
-      setTimeout(() => {
-        loading.classList.add('hidden');
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+      try {
+        let isTrue = false;
+        let details = '';
 
-        const isTrue = Math.random() > 0.5;
+        // 1. Try local FastAPI backend if running
+        let backendOk = false;
+        try {
+          const res = await fetch('http://127.0.0.1:8000/api/rumors/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: input })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            isTrue = !data.is_unverified;
+            details = data.ground_truth ? data.ground_truth.text : '';
+            backendOk = true;
+          }
+        } catch (err) {
+          backendOk = false;
+        }
+
+        // 2. Client-side real-time evidence fallback (Works on GitHub Pages)
+        if (!backendOk) {
+          const clean = input.replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
+          const qLower = clean.toLowerCase();
+          const qWords = qLower.split(/\s+/).filter(w => w.length > 2);
+
+          const isDisasterOrCrisis = /flood|cyclone|earthquake|storm|dam|rain|fire|accident|landslide|submerged|outage|epidemic|hospital|evacuate/.test(qLower);
+
+          const wikiUrl = `https://en.wikipedia.org/w/api.php?origin=*&action=query&list=search&srsearch=${encodeURIComponent(clean)}&format=json&utf8=1`;
+          const res = await fetch(wikiUrl);
+          if (res.ok) {
+            const data = await res.json();
+            const items = (data.query && data.query.search) || [];
+            
+            let bestRatio = 0.0;
+            let isFiction = false;
+
+            items.slice(0, 5).forEach(item => {
+              const textLower = (item.snippet + ' ' + item.title).toLowerCase();
+              let hits = 0;
+              qWords.forEach(w => { if (textLower.includes(w)) hits++; });
+              const r = hits / Math.max(qWords.length, 1);
+              if (r > bestRatio) bestRatio = r;
+              if (item.title.toLowerCase().includes('(film)') || item.title.toLowerCase().includes('(song)')) {
+                isFiction = true;
+              }
+            });
+
+            if (isDisasterOrCrisis && bestRatio >= 0.65) {
+              isTrue = true;
+            } else if (isFiction && !qLower.includes('film') && !qLower.includes('movie')) {
+              isTrue = false;
+            } else if (bestRatio >= 0.85 && !isFiction) {
+              isTrue = true;
+            } else {
+              isTrue = false;
+            }
+          }
+        }
 
         if (isTrue) {
           verdictText.textContent = "TRUE";
@@ -163,7 +217,16 @@
         }
 
         resultBox.classList.remove('hidden');
-      }, 1500);
+      } catch (err) {
+        console.error('Verification error:', err);
+        verdictText.textContent = "FALSE";
+        verdictText.className = "text-4xl font-black text-rose-600 tracking-wider";
+        resultBox.classList.remove('hidden');
+      } finally {
+        loading.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+      }
     }
   </script>
 
