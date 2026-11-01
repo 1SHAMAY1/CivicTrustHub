@@ -15,7 +15,16 @@ Unverified rumors, fabricated news, and coordinated disinformation proliferate a
 ---
 
 ## 💡 Solution
-**CivicTrustHub** is an ultra-fast, zero-LLM-cost verification engine that delivers instant truth verdicts on viral online claims and everyday social media rumors. It performs real-time web and news stream ingestion (Google News RSS & Wikipedia) and computes semantic similarity using local PyTorch MiniLM tensor embeddings, providing citizens and authorities with immediate, verifiable source evidence without proprietary API fees or stale databases.
+**CivicTrustHub** is an ultra-fast, zero-LLM-cost verification engine that delivers instant truth verdicts on viral online claims and everyday social media rumors. It couples real-time web and news stream ingestion (Google News RSS & Wikipedia) with local PyTorch MiniLM tensor embeddings and a multi-stage linguistic evaluation pipeline (polarity alignment, temporal guards, and conversational prompt filtering). Citizens and authorities receive immediate, verifiable source evidence without proprietary API fees or stale databases.
+
+---
+
+## 🛡️ Multi-Layer Precision & Robustness Engine
+To prevent hallucinated verdicts and bag-of-words pitfalls, CivicTrustHub processes claims through 4 robust analytical layers:
+1. **Conversational & Non-Assertion Guard**: Detects questions (`"how to..."`, `"what is..."`), 2nd-person chat prompts (`"tell me about yourself"`), and conversational praise, guiding the user to input assertive claims only.
+2. **Directional Polarity & Negation Logic**: Distinguishes affirmative claims from negative assertions (`"not married"`, `"never happened"`), evaluating sign alignment between the claim and the retrieved evidence.
+3. **Temporal Future-Tense Guard**: Analyzes publication dates and future modal qualifiers (`"scheduled for 2026"`, `"upcoming release"`), preventing unreleased upcoming media or events from being falsely marked as completed.
+4. **Calibrated Semantic Tensor Scoring**: Combines subject-action embeddings with cosine similarity thresholds to dynamically scale confidence scores without arbitrary hardcoded jumps.
 
 ---
 
@@ -53,12 +62,14 @@ flowchart TD
         ServerEdge -->|Invalid Query| FastReject["Return 200: 'Please check rumors only.'"]
         ServerEdge -->|Valid Claim| LiveSweep[Live Ingestion: Google News RSS + Wiki API]
         LiveSweep --> TensorMatcher["Semantic Tensor Matcher (PyTorch MiniLM / TF-IDF Vector)"]
-        TensorMatcher --> ScoreEngine["Cosine Similarity & Panic Index Classifier"]
+        TensorMatcher --> PolarityTemporal["Polarity Alignment & Temporal Guard Engine"]
+        PolarityTemporal --> ScoreEngine["Cosine Similarity & Panic Index Classifier"]
     end
 
     subgraph BrowserEngine ["In-Browser Engine"]
         ClientLiveEngine --> WikiSearch[Wikimedia Real-Time REST Search]
-        WikiSearch --> KeywordDensity[Intent & Semantic Overlap Classifier]
+        WikiSearch --> PolarityTemporalClient["Polarity & Future-Tense Analysis"]
+        PolarityTemporalClient --> KeywordDensity[Calibrated Confidence Scorer]
     end
 
     ScoreEngine --> VerdictCard[Verdict Card: TRUE / FALSE + Proof Evidence]
