@@ -3,1223 +3,169 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CivicTrust Hub - AI Civic Transparency & Fraud Auditing Platform</title>
-  <!-- Tailwind CSS CDN -->
+  <title>CivicTrustHub</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Lucide Icons CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: { 50: '#eff6ff', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a' },
-            crimson: { 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c' },
-            amber: { 500: '#f59e0b', 600: '#d97706' },
-            emerald: { 500: '#10b981', 600: '#059669' }
-          }
-        }
-      }
-    }
-  </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
-    body { font-family: 'Plus Jakarta Sans', sans-serif; }
-    code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
-    .glass-card {
-      background: rgba(255, 255, 255, 0.94);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(226, 232, 240, 0.8);
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: radial-gradient(circle at 50% 0%, #ffffff 0%, #f1f5f9 45%, #e2e8f0 100%);
     }
-    .badge-pulse {
-      animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+    /* Skeuomorphic tactile input container */
+    .skeuo-search-container {
+      background: linear-gradient(145deg, #ffffff, #f0f4f8);
+      box-shadow: 
+        8px 8px 20px rgba(163, 177, 198, 0.45),
+        -8px -8px 20px rgba(255, 255, 255, 0.95),
+        inset 1px 1px 2px rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.8);
     }
-    @keyframes pulse-glow {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+
+    /* Inset field well */
+    .skeuo-input {
+      box-shadow: 
+        inset 2px 2px 5px rgba(163, 177, 198, 0.3),
+        inset -2px -2px 5px rgba(255, 255, 255, 0.8);
+      background: #f8fafc;
     }
-    .custom-scroll::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+
+    /* Skeuomorphic WhatsApp-style send button */
+    .skeuo-send-btn {
+      background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+      box-shadow: 
+        3px 3px 8px rgba(21, 128, 61, 0.35),
+        -2px -2px 6px rgba(255, 255, 255, 0.8),
+        inset 0 1px 1px rgba(255, 255, 255, 0.4);
+      transition: all 0.15s ease-in-out;
     }
-    .custom-scroll::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 4px;
+
+    .skeuo-send-btn:hover {
+      background: linear-gradient(135deg, #25d366 0%, #16a34a 100%);
+      box-shadow: 
+        4px 4px 12px rgba(21, 128, 61, 0.45),
+        -2px -2px 8px rgba(255, 255, 255, 0.9),
+        inset 0 1px 1px rgba(255, 255, 255, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .skeuo-send-btn:active {
+      background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+      box-shadow: 
+        inset 2px 2px 5px rgba(0, 0, 0, 0.3),
+        inset -1px -1px 3px rgba(255, 255, 255, 0.2);
+      transform: translateY(1px);
+    }
+
+    /* Skeuomorphic tactile verdict card */
+    .skeuo-card {
+      background: linear-gradient(145deg, #ffffff, #f8fafc);
+      box-shadow: 
+        10px 10px 25px rgba(163, 177, 198, 0.35),
+        -10px -10px 25px rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+    }
+
+    /* Title emboss */
+    .skeuo-title {
+      color: #1e293b;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 -1px 0 rgba(0, 0, 0, 0.1);
     }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen antialiased flex flex-col selection:bg-blue-600 selection:text-white">
+<body class="min-h-screen flex flex-col items-center justify-between py-12 px-4 selection:bg-green-500 selection:text-white">
 
-  <!-- Top Navigation Bar -->
-  <header class="border-b border-slate-800 bg-slate-950/80 sticky top-0 z-50 backdrop-blur-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
-          <i data-lucide="shield-alert" class="w-6 h-6 text-white"></i>
-        </div>
-        <div>
-          <div class="flex items-center space-x-2">
-            <span class="font-extrabold text-xl tracking-tight text-white">Civic<span class="text-blue-500">Trust</span> Hub</span>
-            <span class="px-2 py-0.5 text-xs font-semibold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-full">v2.4 Live Demo</span>
-          </div>
-          <p class="text-xs text-slate-400 hidden sm:block">Automated Public Procurement Anomaly Detection & Crisis Rumor Verification</p>
-        </div>
-      </div>
-
-      <!-- Controls & Mode Indicator -->
-      <div class="flex items-center space-x-3">
-        <div class="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 badge-pulse"></span>
-          <span class="text-slate-300 font-medium" id="engineStatusBadge">Hybrid Engine: Active</span>
-        </div>
-
-        <button onclick="openApiModal()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
-          <i data-lucide="cpu" class="w-3.5 h-3.5 text-blue-400"></i>
-          <span id="apiKeyStatusText">AI Key (Optional)</span>
-        </button>
-
-        <button onclick="downloadActionPacket()" class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/30 transition transform active:scale-95">
-          <i data-lucide="download" class="w-3.5 h-3.5"></i>
-          <span>Export Action Packet</span>
-        </button>
-      </div>
-    </div>
+  <!-- Brand Title placed high up with strong identity -->
+  <header class="w-full text-center pt-2">
+    <h1 class="skeuo-title text-4xl sm:text-5xl font-extrabold tracking-tight">
+      CivicTrustHub
+    </h1>
   </header>
 
-  <!-- Main Container -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-
-    <!-- Scenario Selector Bar -->
-    <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur">
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <div class="flex items-center space-x-2">
-            <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
-            <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300">1-Click Preset Audit Scenarios</h2>
-          </div>
-          <p class="text-xs text-slate-400 mt-0.5">Switch simulated municipality environments instantaneously to test statistical fraud tests and semantic debunker.</p>
-        </div>
-        <div class="flex flex-wrap gap-2" id="scenarioButtons">
-          <!-- Populated by JS -->
-        </div>
+  <!-- Main Content Area with generous gap from header -->
+  <main class="w-full max-w-xl flex flex-col items-center -mt-16 sm:-mt-24 space-y-8">
+    
+    <!-- Search Form with WhatsApp-style send icon & skeuomorphic white design -->
+    <form onsubmit="handleSearch(event)" class="w-full">
+      <div class="skeuo-search-container p-2.5 rounded-full flex items-center gap-2">
+        <input 
+          type="text" 
+          id="rumorInput" 
+          placeholder="Search or enter a rumor..." 
+          class="skeuo-input flex-1 px-6 py-4 rounded-full text-slate-800 placeholder-slate-400 focus:outline-none text-base border-none"
+          required
+        />
+        
+        <!-- WhatsApp-style Send Button -->
+        <button 
+          type="submit" 
+          id="submitBtn" 
+          title="Send"
+          class="skeuo-send-btn w-13 h-13 p-3.5 rounded-full text-white flex items-center justify-center shrink-0 cursor-pointer"
+        >
+          <!-- WhatsApp send arrow icon -->
+          <svg class="w-5 h-5 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+          </svg>
+        </button>
       </div>
+    </form>
+
+    <!-- Loading State -->
+    <div id="loadingIndicator" class="hidden flex-col items-center justify-center space-y-3 py-4">
+      <div class="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-xs uppercase tracking-wider text-slate-500 font-semibold">Verifying Rumor...</p>
     </div>
 
-    <!-- Executive KPI Row -->
-    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <!-- KPI 1 -->
-      <div class="bg-slate-950/60 border border-slate-800 p-4 rounded-xl relative overflow-hidden group hover:border-slate-700 transition">
-        <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
-          <span>Tenders Audited</span>
-          <i data-lucide="file-spreadsheet" class="w-4 h-4 text-blue-400"></i>
-        </div>
-        <div class="mt-2 flex items-baseline space-x-2">
-          <span class="text-2xl lg:text-3xl font-extrabold text-white" id="kpiTendersAudited">0</span>
-          <span class="text-xs text-slate-400" id="kpiTotalSpend">₹0 Cr</span>
-        </div>
-        <div class="mt-1 text-xs text-blue-400 flex items-center space-x-1">
-          <i data-lucide="check-circle" class="w-3 h-3"></i>
-          <span>100% contracts scanned</span>
-        </div>
-      </div>
-
-      <!-- KPI 2 -->
-      <div class="bg-slate-950/60 border border-rose-900/40 p-4 rounded-xl relative overflow-hidden group hover:border-rose-700/60 transition">
-        <div class="flex items-center justify-between text-rose-400 text-xs font-medium">
-          <span>Flagged Anomalies</span>
-          <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-500"></i>
-        </div>
-        <div class="mt-2 flex items-baseline space-x-2">
-          <span class="text-2xl lg:text-3xl font-extrabold text-rose-400" id="kpiFlaggedAnomalies">0</span>
-          <span class="text-xs px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold" id="kpiRiskLevel">High Risk</span>
-        </div>
-        <div class="mt-1 text-xs text-rose-300/80" id="kpiAnomalyBreakdown">
-          0 Price Outliers | 0 Split Bids
-        </div>
-      </div>
-
-      <!-- KPI 3 -->
-      <div class="bg-slate-950/60 border border-amber-900/40 p-4 rounded-xl relative overflow-hidden group hover:border-amber-700/60 transition">
-        <div class="flex items-center justify-between text-amber-400 text-xs font-medium">
-          <span>Crisis Panic-Index</span>
-          <i data-lucide="flame" class="w-4 h-4 text-amber-500"></i>
-        </div>
-        <div class="mt-2 flex items-baseline space-x-2">
-          <span class="text-2xl lg:text-3xl font-extrabold text-amber-400" id="kpiPanicIndex">0.0</span>
-          <span class="text-xs text-slate-400">/ 100</span>
-        </div>
-        <div class="mt-1 text-xs text-amber-300/80 flex items-center space-x-1">
-          <i data-lucide="activity" class="w-3 h-3"></i>
-          <span id="kpiPanicSub">Weighted social velocity</span>
-        </div>
-      </div>
-
-      <!-- KPI 4 -->
-      <div class="bg-slate-950/60 border border-emerald-900/40 p-4 rounded-xl relative overflow-hidden group hover:border-emerald-700/60 transition">
-        <div class="flex items-center justify-between text-emerald-400 text-xs font-medium">
-          <span>Debunk Trust-Index</span>
-          <i data-lucide="badge-check" class="w-4 h-4 text-emerald-400"></i>
-        </div>
-        <div class="mt-2 flex items-baseline space-x-2">
-          <span class="text-2xl lg:text-3xl font-extrabold text-emerald-400" id="kpiTrustIndex">0%</span>
-          <span class="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold" id="kpiVerifiedCount">0 Verified</span>
-        </div>
-        <div class="mt-1 text-xs text-emerald-300/80">
-          Official bulletins reconciled
-        </div>
-      </div>
-    </section>
-
-    <!-- Main Workspace Tabs -->
-    <div class="flex items-center border-b border-slate-800 space-x-6 text-sm font-semibold">
-      <button onclick="switchTab('procurement')" id="tabProcurementBtn" class="pb-3 border-b-2 border-blue-500 text-blue-400 flex items-center space-x-2">
-        <i data-lucide="gavel" class="w-4 h-4"></i>
-        <span>1. Public Procurement Fraud Radar</span>
-        <span class="px-2 py-0.2 text-[10px] bg-rose-500/20 text-rose-400 rounded-full" id="badgeProcCount">0</span>
-      </button>
-      <button onclick="switchTab('rumor')" id="tabRumorBtn" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2">
-        <i data-lucide="radio" class="w-4 h-4"></i>
-        <span>2. Crisis Rumor Semantic Verifier</span>
-        <span class="px-2 py-0.2 text-[10px] bg-amber-500/20 text-amber-400 rounded-full" id="badgeRumorCount">0</span>
-      </button>
-      <button onclick="switchTab('action')" id="tabActionBtn" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2">
-        <i data-lucide="file-check" class="w-4 h-4"></i>
-        <span>3. Ready-to-Send RTI & Counter-Card Packet</span>
-      </button>
+    <!-- Skeuomorphic Result Card -->
+    <div id="resultBox" class="hidden skeuo-card w-full max-w-sm p-6 rounded-3xl text-center transition-all duration-300">
+      <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Status</span>
+      <div id="verdictText" class="text-3xl font-extrabold tracking-wider"></div>
     </div>
-
-    <!-- TAB 1: PROCUREMENT ANALYZER -->
-    <section id="tabProcurement" class="space-y-6">
-      <!-- Methodology banner -->
-      <div class="p-3.5 bg-blue-950/30 border border-blue-800/40 rounded-xl flex items-start space-x-3 text-xs text-slate-300">
-        <i data-lucide="info" class="w-4 h-4 text-blue-400 mt-0.5 shrink-0"></i>
-        <div>
-          <span class="font-bold text-white">Deterministic Anomaly Logic Active:</span>
-          Identifies <strong>Price Outliers (&gt; 2.0&sigma; from category median / expected unit price)</strong> and <strong>Contract-Splitting Patterns</strong> (repetitive below-threshold awards under &lt;₹50L to identical vendor shell clusters within 60 days).
-        </div>
-      </div>
-
-      <!-- Charts & Breakdown Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 shadow-xl">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="text-sm font-bold text-slate-200">Tender Unit Price vs. Category Benchmark (&sigma; Variance)</h3>
-              <p class="text-xs text-slate-400">Red markers indicate anomalous price deviation requiring RTI inquiry</p>
-            </div>
-            <span class="text-xs px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-300 font-mono">Z-Score Threshold = 2.0</span>
-          </div>
-          <div class="h-64">
-            <canvas id="procurementChart"></canvas>
-          </div>
-        </div>
-
-        <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
-          <div>
-            <h3 class="text-sm font-bold text-slate-200 mb-1">Vendor Contract Concentration</h3>
-            <p class="text-xs text-slate-400 mb-3">Detecting repeat shell companies evading tender limits</p>
-            <div class="h-48">
-              <canvas id="vendorDoughnutChart"></canvas>
-            </div>
-          </div>
-          <div id="vendorRiskAlert" class="mt-3 p-2.5 bg-rose-950/30 border border-rose-800/40 rounded-lg text-xs text-rose-300 flex items-center space-x-2">
-            <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400 shrink-0"></i>
-            <span id="vendorRiskText">Analyzing vendor frequency...</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Interactive Tenders Table -->
-      <div class="bg-slate-950/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 class="text-sm font-bold text-slate-200">Public Tender Contract Audit Ledger</h3>
-            <p class="text-xs text-slate-400">Click any row to view forensic audit trace and include in official RTI notice</p>
-          </div>
-          <div class="flex items-center space-x-2">
-            <button onclick="filterTenders('all')" class="px-2.5 py-1 rounded text-xs bg-slate-800 text-slate-300 hover:bg-slate-700" id="btnFilterAll">All</button>
-            <button onclick="filterTenders('anomaly')" class="px-2.5 py-1 rounded text-xs bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600/30 font-medium" id="btnFilterAnomalies">Anomalies Only</button>
-          </div>
-        </div>
-
-        <div class="overflow-x-auto custom-scroll">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-900/80 text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-800">
-              <tr>
-                <th class="py-3 px-4">Tender ID</th>
-                <th class="py-3 px-4">Department & Item</th>
-                <th class="py-3 px-4">Vendor Name</th>
-                <th class="py-3 px-4">Contract Amount</th>
-                <th class="py-3 px-4">Benchmark Price</th>
-                <th class="py-3 px-4">Z-Score / Deviation</th>
-                <th class="py-3 px-4">Risk Classification</th>
-                <th class="py-3 px-4 text-right">RTI Action</th>
-              </tr>
-            </thead>
-            <tbody id="tenderTableBody" class="divide-y divide-slate-800/60 text-slate-300">
-              <!-- Populated by JS -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 2: RUMOR VERIFIER -->
-    <section id="tabRumor" class="space-y-6 hidden">
-      <!-- Methodology banner -->
-      <div class="p-3.5 bg-amber-950/30 border border-amber-800/40 rounded-xl flex items-start space-x-3 text-xs text-slate-300">
-        <i data-lucide="info" class="w-4 h-4 text-amber-400 mt-0.5 shrink-0"></i>
-        <div>
-          <span class="font-bold text-white">Semantic Cross-Encoder Matching Active:</span>
-          Uses dense semantic embedding similarity (&ge;0.40 threshold) to verify incoming social media panic messages against vetted State Disaster Management Authority & District Collector bulletins. Calculates <strong>Panic-Index = Volume &times; (1 &minus; Similarity)</strong>.
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Social Messages Queue -->
-        <div class="lg:col-span-2 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-sm font-bold text-slate-200">Live Ingested Crisis Social Signals (JSON Streams)</h3>
-              <p class="text-xs text-slate-400">Evaluating virulence, sentiment escalation, and official verification</p>
-            </div>
-            <span class="text-xs px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-lg font-mono">Batch Size: 4 Feeds</span>
-          </div>
-
-          <div id="rumorsList" class="space-y-3">
-            <!-- Populated by JS -->
-          </div>
-        </div>
-
-        <!-- Official Bulletins & Real-time Cross Check -->
-        <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-bold text-slate-200">Official Truth Registry</h3>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold uppercase">Vetted Source</span>
-          </div>
-          <p class="text-xs text-slate-400 mb-3">Authentic administrative press briefings used as ground truth:</p>
-
-          <div id="bulletinList" class="space-y-2 text-xs overflow-y-auto max-h-80 custom-scroll pr-1 flex-1">
-            <!-- Populated by JS -->
-          </div>
-
-          <div class="mt-4 pt-3 border-t border-slate-800">
-            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Test Custom Citizen Rumor Message</label>
-            <div class="flex space-x-2">
-              <input type="text" id="customRumorInput" placeholder="e.g. Metro lines shut down due to flooding..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500">
-              <button onclick="testCustomRumor()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shrink-0">Analyze</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 3: ACTION PACKET (RTI & COUNTER-CARD) -->
-    <section id="tabAction" class="space-y-6 hidden">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Ready-to-send RTI Notice -->
-        <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div class="flex items-center space-x-2">
-                <i data-lucide="file-text" class="w-5 h-5 text-blue-400"></i>
-                <h3 class="text-sm font-bold text-slate-100">Statutory Right to Information (RTI) Formal Request</h3>
-              </div>
-              <span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono">Sec. 6(1) RTI Act 2005</span>
-            </div>
-            <p class="text-xs text-slate-400 my-3">Automatically populated with flagged procurement rows, exact price deviation percentages, and shell vendor clauses ready for certified submission to the Public Information Officer (PIO).</p>
-            
-            <div class="relative">
-              <pre id="rtiPreview" class="bg-slate-900 p-4 rounded-xl text-xs font-mono text-slate-300 border border-slate-800 overflow-x-auto max-h-96 custom-scroll whitespace-pre-wrap leading-relaxed select-all"></pre>
-            </div>
-          </div>
-
-          <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-            <span class="text-xs text-slate-400">Includes legal compliance citations</span>
-            <button onclick="copyToClipboard('rtiPreview', 'RTI Request Copied!')" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700">
-              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-              <span id="copyRtiLabel">Copy Formal RTI Text</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Bilingual Counter-Card Debunker -->
-        <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div class="flex items-center space-x-2">
-                <i data-lucide="megaphone" class="w-5 h-5 text-amber-400"></i>
-                <h3 class="text-sm font-bold text-slate-100">Bilingual Citizen Counter-Card (Fact-Check)</h3>
-              </div>
-              <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono">Shareable Social Asset</span>
-            </div>
-            <p class="text-xs text-slate-400 my-3">High-contrast, dual-language card formatted for WhatsApp Forward / Twitter / Telegram distribution to immediately curb public hysteria.</p>
-
-            <!-- Rendered Graphic Counter Card -->
-            <div id="counterCardContainer" class="rounded-xl border-2 border-rose-500/60 bg-gradient-to-br from-slate-900 via-slate-900 to-rose-950/40 p-4 shadow-2xl relative overflow-hidden">
-              <div class="flex items-center justify-between border-b border-rose-500/30 pb-2 mb-3">
-                <div class="flex items-center space-x-2">
-                  <span class="px-2 py-0.5 bg-rose-600 text-white font-extrabold text-[11px] rounded uppercase tracking-wider">OFFICIAL FACT-CHECK</span>
-                  <span class="text-[11px] text-slate-400" id="cardTimestamp">District Disaster Cell</span>
-                </div>
-                <span class="text-xs font-bold text-rose-400 flex items-center space-x-1">
-                  <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
-                  <span>CLAIM: FALSE</span>
-                </span>
-              </div>
-
-              <!-- English & Hindi / Regional Side-by-Side -->
-              <div class="space-y-3">
-                <div class="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
-                  <span class="text-[10px] font-semibold text-rose-400 uppercase tracking-wide">Rumor Reported (दावा)</span>
-                  <p class="text-xs font-medium text-slate-200 mt-0.5" id="cardRumorText">Loading active high-panic rumor...</p>
-                </div>
-
-                <div class="bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-800/40">
-                  <span class="text-[10px] font-semibold text-emerald-400 uppercase tracking-wide">Verified Truth (सत्यापित सच्चाई)</span>
-                  <p class="text-xs font-semibold text-emerald-200 mt-0.5" id="cardTruthEn">Official clarification here...</p>
-                  <p class="text-xs font-medium text-emerald-300 mt-1 font-serif" id="cardTruthHi">हिंदी अनुवाद यहाँ...</p>
-                </div>
-              </div>
-
-              <div class="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
-                <span>Verified by CivicTrust Hub AI &middot; Source: SDMA</span>
-                <span class="font-mono text-blue-400">#FightMisinformation</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-            <span class="text-xs text-slate-400">Ready for instant WhatsApp forwarding</span>
-            <button onclick="copyToClipboard('cardRumorText', 'Text Copied for WhatsApp!')" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold">
-              <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
-              <span>Copy WhatsApp Broadcast Text</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Hackathon Submission Pitch Card (Accordion / Quick Review) -->
-    <section class="bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 border border-blue-800/50 rounded-2xl p-5 shadow-2xl">
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <span class="px-2.5 py-1 text-xs font-bold bg-blue-500 text-white rounded-md uppercase tracking-wider">Judges & Submission Pitch Kit</span>
-          <h2 class="text-lg font-bold text-white mt-1.5">CivicTrust Hub: Automated Procurement Fraud Audit & Crisis Verification</h2>
-          <p class="text-xs text-slate-300 max-w-3xl mt-1">
-            Replaces reactive, manual watchdog investigations with an end-to-end civic accountability loop: from statistical Z-score fraud flagging directly to ready-to-file legal RTI notices and citizen counter-propaganda in under 60 seconds.
-          </p>
-        </div>
-        <div class="flex items-center space-x-3 shrink-0">
-          <button onclick="togglePitchDetails()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition">
-            <i data-lucide="file-badge" class="w-4 h-4 text-amber-400"></i>
-            <span id="pitchToggleText">Show Submission Details</span>
-          </button>
-        </div>
-      </div>
-
-      <div id="pitchDetails" class="mt-4 pt-4 border-t border-slate-800 text-xs grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
-        <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">
-          <div class="font-bold text-blue-400 uppercase text-[11px] mb-1">1. Algorithmic Rigor</div>
-          <p class="text-slate-300">Dual-engine architecture: (1) Median Absolute Deviation & Z-scores with Benford-like frequency tests for bid-rigging; (2) Fast semantic vector-space cosine matching (MiniLM representation) for rumor debunking.</p>
-        </div>
-        <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">
-          <div class="font-bold text-amber-400 uppercase text-[11px] mb-1">2. Complete Closed Loop</div>
-          <p class="text-slate-300">Does not simply output an abstract graph—generates statutory RTI legal petitions with specific contract row cites and WhatsApp-formatted crisis counter-cards with localized vernacular translations.</p>
-        </div>
-        <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">
-          <div class="font-bold text-emerald-400 uppercase text-[11px] mb-1">3. 100% Deterministic Fallback</div>
-          <p class="text-slate-300">Zero external API dependencies required. Contains a fully autonomous offline semantic matcher that guarantees instant, failproof demonstration to hackathon evaluators.</p>
-        </div>
-      </div>
-    </section>
 
   </main>
 
-  <!-- Footer -->
-  <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500 bg-slate-950">
-    CivicTrust Hub &bull; 1-Hour Hackathon Production Release &bull; Built with deterministic statistical math & semantic verification
-  </footer>
+  <!-- Empty balanced footer space -->
+  <div class="h-6"></div>
 
-  <!-- API Key Modal (Optional AI integration) -->
-  <div id="apiModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-      <button onclick="closeApiModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
-        <i data-lucide="x" class="w-5 h-5"></i>
-      </button>
-      <div class="flex items-center space-x-2 mb-3">
-        <i data-lucide="cpu" class="w-5 h-5 text-blue-400"></i>
-        <h3 class="text-base font-bold text-white">Optional AI Key (Gemini / OpenAI)</h3>
-      </div>
-      <p class="text-xs text-slate-400 mb-4">
-        CivicTrust Hub runs <strong>100% offline</strong> using its built-in deterministic statistical engine and semantic word-vector matrix. If you'd like to test live LLM augmentations, you may paste your API key below:
-      </p>
-
-      <div class="space-y-3">
-        <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">Provider</label>
-          <select id="apiProvider" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100">
-            <option value="gemini">Google Gemini 1.5 / 2.0</option>
-            <option value="openai">OpenAI GPT-4o</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">API Key</label>
-          <input type="password" id="apiKeyInput" placeholder="AIzaSy... or sk-proj-..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-blue-500 font-mono">
-        </div>
-      </div>
-
-      <div class="mt-5 flex justify-end space-x-2">
-        <button onclick="closeApiModal()" class="px-3.5 py-2 text-xs text-slate-400 hover:text-white">Cancel</button>
-        <button onclick="saveApiKey()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold">Save & Activate</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Application Logic & Datasets -->
   <script>
-    // ==========================================
-    // PRESET REALISTIC CIVIC SCENARIOS
-    // ==========================================
-    const SCENARIOS = [
-      {
-        id: 'scenario-flood',
-        name: 'Monsoon Urban Crisis (Floods & Drain Tenders)',
-        city: 'Metropolitan Urban Development Board',
-        totalBudget: '₹ 84.5 Cr',
-        tenders: [
-          { id: 'TND-2024-8801', dept: 'Stormwater & Drainage', item: 'High-Volume Dewatering Pumps (50HP)', vendor: 'Apex Infra Concessionaires', amount: 8400000, benchmark: 2200000, quantity: 4, unitPrice: 2100000, benchUnit: 550000, zScore: 3.42, flag: 'Extreme Overpricing (>280% markup)', date: '2024-09-12' },
-          { id: 'TND-2024-8802', dept: 'Disaster Relief Support', item: 'Emergency Life Jackets & Rescue Rafts', vendor: 'Apex Infra Concessionaires', amount: 4800000, benchmark: 4700000, quantity: 200, unitPrice: 24000, benchUnit: 23500, zScore: 0.15, flag: 'Contract Splitting (Below ₹50L cap)', date: '2024-09-14' },
-          { id: 'TND-2024-8803', dept: 'Public Health Sanitation', item: 'Bleaching Powder & Disinfectant Sacks', vendor: 'Apex Infra Concessionaires', amount: 4900000, benchmark: 4800000, quantity: 500, unitPrice: 9800, benchUnit: 9600, zScore: 0.12, flag: 'Contract Splitting (Below ₹50L cap)', date: '2024-09-15' },
-          { id: 'TND-2024-8804', dept: 'Stormwater & Drainage', item: 'Canal Desilting & Silt Dredging', vendor: 'Zenith Earthmovers Ltd', amount: 34500000, benchmark: 11000000, quantity: 1, unitPrice: 34500000, benchUnit: 11000000, zScore: 4.18, flag: 'Severe Cartel Outlier (>310% markup)', date: '2024-09-10' },
-          { id: 'TND-2024-8805', dept: 'Roads & Bridges', item: 'Temporary Bailey Bridge Construction', vendor: 'National Structurals Pvt', amount: 21000000, benchmark: 20500000, quantity: 1, unitPrice: 21000000, benchUnit: 20500000, zScore: 0.08, flag: 'Normal Verified', date: '2024-09-08' },
-          { id: 'TND-2024-8806', dept: 'Public Health Sanitation', item: 'Mobile Drinking Water Tanker Fleet', vendor: 'AquaPure Logistics', amount: 10900000, benchmark: 10500000, quantity: 15, unitPrice: 726666, benchUnit: 700000, zScore: 0.22, flag: 'Normal Verified', date: '2024-09-11' }
-        ],
-        rumors: [
-          {
-            id: 'RUMOR-01',
-            text: 'URGENT: Chembarambakkam Dam gates opened without warning. 10-meter wave hitting downtown in 30 minutes! Evacuate immediately!!',
-            platform: 'WhatsApp Viral Forward',
-            reach: 48000,
-            panicScore: 92,
-            keywords: ['dam gates opened', '10-meter wave', 'evacuate immediately'],
-            matches: [
-              { source: 'State Disaster Management Authority (SDMA)', bulletin: 'All 4 reservoir gates operating under regulated 500 cusecs discharge. No unannounced opening. Water levels are 4 feet below safety margin.', sim: 0.18 }
-            ],
-            counterEn: 'FALSE ALARM: Reservoir discharge is strictly controlled at 500 cusecs with 4 feet of buffer. No tidal wave or sudden flood exists. Strict legal action being taken against panic-mongers.',
-            counterHi: 'अफवाह से बचें: बांध से केवल 500 क्यूसेक पानी सुरक्षित रूप से छोड़ा जा रहा है। बाढ़ का कोई खतरा नहीं है। अफवाहों पर ध्यान न दें।'
-          },
-          {
-            id: 'RUMOR-02',
-            text: 'Drinking water pipeline contaminated with cholera in Ward 14 due to sewage backflow. 50+ hospitalised in ICU!',
-            platform: 'Twitter / X Trend',
-            reach: 22000,
-            panicScore: 78,
-            keywords: ['drinking water contaminated', 'cholera in ward 14', '50 hospitalised'],
-            matches: [
-              { source: 'Municipal Corporation Health Department', bulletin: 'Continuous water testing conducted across all 24 wards. Residual chlorine levels at healthy 0.5 ppm. Zero cholera cases admitted in government or private hospitals.', sim: 0.21 }
-            ],
-            counterEn: 'FACT CHECK: Municipal chlorine testing confirms water is 100% safe (0.5 ppm). Zero hospital admissions recorded. Municipal supply is safe for boiling and consumption.',
-            counterHi: 'सत्यापित: वार्ड 14 में जलापूर्ति की जांच की गई है, पानी पूरी तरह सुरक्षित है। किसी भी अस्पताल में भर्ती का कोई मामला नहीं है।'
-          },
-          {
-            id: 'RUMOR-03',
-            text: 'All Central Metro stations shut down indefinitely as tracks are submerged under 5 feet of water.',
-            platform: 'Telegram Channel',
-            reach: 14000,
-            panicScore: 54,
-            keywords: ['metro stations shut', 'tracks submerged'],
-            matches: [
-              { source: 'Metro Rail Corporation Public PR', bulletin: 'Metro operations are running on scheduled frequency every 7 minutes. Track water clearing pumps functioning normally across all underground corridors.', sim: 0.29 }
-            ],
-            counterEn: 'STATUS: NORMAL. Metro Rail is operational on all lines with a 7-minute headway. High-speed pumps have cleared underground tracks.',
-            counterHi: 'मेट्रो सेवा सामान्य रूप से चल रही है। ट्रैक पूरी तरह चालू हैं, कोई लाइन बंद नहीं है।'
-          }
-        ],
-        bulletins: [
-          'SDMA Alert: All 4 reservoir gates operating under regulated 500 cusecs discharge. No unannounced opening.',
-          'Municipal Health Dept: Water testing shows optimal 0.5 ppm chlorine across all wards. Zero epidemic admissions.',
-          'Metro Rail Corporation: Full rail operations active across Green and Blue lines every 7 minutes.',
-          'District Collector: 48 relief camps equipped with power, meals, and certified medicine packets.'
-        ]
-      },
-      {
-        id: 'scenario-health',
-        name: 'Public Hospital Oxygen & Medical Supplies',
-        city: 'State Directorate of Medical Services',
-        totalBudget: '₹ 112.0 Cr',
-        tenders: [
-          { id: 'TND-2024-4101', dept: 'Medical Gas Supply', item: 'Cryogenic Liquid Medical Oxygen (Per KL)', vendor: 'BioLife CryoTech Ltd', amount: 28000000, benchmark: 8500000, quantity: 20, unitPrice: 1400000, benchUnit: 425000, zScore: 3.89, flag: 'Extreme Overpricing (>220% markup)', date: '2024-08-20' },
-          { id: 'TND-2024-4102', dept: 'ICU Critical Equipment', item: 'High-End Transport Ventilators', vendor: 'BioLife CryoTech Ltd', amount: 4950000, benchmark: 4800000, quantity: 5, unitPrice: 990000, benchUnit: 960000, zScore: 0.18, flag: 'Contract Splitting (Below ₹50L cap)', date: '2024-08-22' },
-          { id: 'TND-2024-4103', dept: 'Diagnostics', item: 'Automated Blood Chemistry Analyzers', vendor: 'MediScan Instruments', amount: 15400000, benchmark: 15000000, quantity: 2, unitPrice: 7700000, benchUnit: 7500000, zScore: 0.14, flag: 'Normal Verified', date: '2024-08-15' }
-        ],
-        rumors: [
-          {
-            id: 'RUMOR-11',
-            text: 'General Civil Hospital has completely run out of oxygen cylinders, patients suffocating in ward 3!',
-            platform: 'WhatsApp Viral Forward',
-            reach: 65000,
-            panicScore: 96,
-            keywords: ['hospital run out of oxygen', 'patients suffocating'],
-            matches: [
-              { source: 'Medical Superintendent Bureau', bulletin: 'Hospital has 72 hours of uninterrupted liquid oxygen reserves (12,000 Litres) stored in primary cryogenic tanks. Manifold pressure 4.2 bar.', sim: 0.14 }
-            ],
-            counterEn: 'CRITICAL ALERT DEBUNKED: Civil Hospital holds 72 hours of continuous cryogenic oxygen reserves. Zero shortages exist. Do not panic.',
-            counterHi: 'अफवाह खंडन: सिविल अस्पताल में 72 घंटे का अतिरिक्त ऑक्सीजन बैकअप उपलब्ध है। कोई कमी नहीं है।'
-          }
-        ],
-        bulletins: [
-          'Hospital Bulletin: Oxygen cryogenic reserves at 94% capacity (12,000 L). Routine surgeries progressing smoothly.',
-          'State Drug Control: Verified stock of 80,000 vials of essential critical antibiotics.'
-        ]
-      },
-      {
-        id: 'scenario-smartcity',
-        name: 'Smart City Surveillance & LED Streetlighting',
-        city: 'Smart Infrastructure Mission Corp',
-        totalBudget: '₹ 65.2 Cr',
-        tenders: [
-          { id: 'TND-2024-1901', dept: 'Surveillance & Traffic', item: 'AI Automatic Number Plate Cameras', vendor: 'CyberShield Systems LLP', amount: 18500000, benchmark: 5200000, quantity: 50, unitPrice: 370000, benchUnit: 104000, zScore: 3.65, flag: 'Severe Cartel Outlier (>255% markup)', date: '2024-10-01' },
-          { id: 'TND-2024-1902', dept: 'Electrical & Power', item: 'Smart Connected LED Luminaires 120W', vendor: 'LumenTech Grid', amount: 12000000, benchmark: 11800000, quantity: 2000, unitPrice: 6000, benchUnit: 5900, zScore: 0.09, flag: 'Normal Verified', date: '2024-10-05' }
-        ],
-        rumors: [
-          {
-            id: 'RUMOR-21',
-            text: 'New smart city cameras are recording biometric faces to freeze citizen bank accounts without trial!',
-            platform: 'Social Video Clip',
-            reach: 31000,
-            panicScore: 68,
-            keywords: ['biometric faces freeze bank accounts'],
-            matches: [
-              { source: 'Municipal Commissioner IT Wing', bulletin: 'Traffic cameras are solely calibrated for optical license plate recognition (ANPR) and traffic congestion optimization. No facial recognition or financial linking capability exists.', sim: 0.16 }
-            ],
-            counterEn: 'MISINFORMATION WARNING: Traffic cameras ONLY capture vehicular license plates for speed and signal violations. They do NOT possess facial biometrics or banking integration.',
-            counterHi: 'तथ्य: यातायात कैमरे केवल नंबर प्लेट और सिग्नल उल्लंघन के लिए हैं। बैंक या चेहरे की बायोमेट्रिक्स से इनका कोई संबंध नहीं है।'
-          }
-        ],
-        bulletins: [
-          'Smart City Directorate: Cameras adhere strictly to National Informatics Centre (NIC) data security compliance.',
-          'Traffic Police: Red light violation automated challans initiated transparently via SMS gateway.'
-        ]
-      }
-    ];
+    function handleSearch(e) {
+      e.preventDefault();
+      
+      const input = document.getElementById('rumorInput').value.trim();
+      if (!input) return;
 
-    // State Variables
-    const BACKEND_URL = "http://127.0.0.1:8000";
-    let isBackendConnected = false;
-    let currentScenario = SCENARIOS[0];
-    let tenderFilter = 'all';
-    let procChartInstance = null;
-    let vendorChartInstance = null;
-    let userApiKey = localStorage.getItem('civictrust_apikey') || '';
-    let userApiProvider = localStorage.getItem('civictrust_provider') || 'gemini';
+      const loading = document.getElementById('loadingIndicator');
+      const resultBox = document.getElementById('resultBox');
+      const verdictText = document.getElementById('verdictText');
+      const submitBtn = document.getElementById('submitBtn');
 
-    // ==========================================
-    // INITIALIZATION & BACKEND PING
-    // ==========================================
-    window.addEventListener('DOMContentLoaded', async () => {
-      lucide.createIcons();
-      renderScenarioButtons();
-      await checkBackendHealth();
-      loadScenario(SCENARIOS[0].id);
-      updateApiKeyUI();
-    });
+      // Hide previous result and show loading
+      resultBox.classList.add('hidden');
+      loading.classList.remove('hidden');
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
 
-    async function checkBackendHealth() {
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/health`, { method: 'GET' });
-        if (res.ok) {
-          isBackendConnected = true;
-          const badge = document.getElementById('engineStatusBadge');
-          if (badge) {
-            badge.innerHTML = `<span class="text-emerald-400 font-bold">FastAPI Backend: Connected (:8000)</span>`;
-          }
+      // Verification delay (Backend team plugs their API call here)
+      setTimeout(() => {
+        loading.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+
+        const isTrue = Math.random() > 0.5;
+
+        if (isTrue) {
+          verdictText.textContent = "TRUE";
+          verdictText.className = "text-4xl font-black text-emerald-600 tracking-wider";
+        } else {
+          verdictText.textContent = "FALSE";
+          verdictText.className = "text-4xl font-black text-rose-600 tracking-wider";
         }
-      } catch (e) {
-        isBackendConnected = false;
-        console.log("FastAPI backend not running at :8000, running on built-in offline engine.");
-      }
-    }
 
-    function renderScenarioButtons() {
-      const container = document.getElementById('scenarioButtons');
-      container.innerHTML = SCENARIOS.map((s, idx) => `
-        <button onclick="loadScenario('${s.id}')" id="btn-scen-${s.id}" class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${idx === 0 ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/30' : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'}">
-          ${s.name.split('(')[0]}
-        </button>
-      `).join('');
-    }
-
-    function loadScenario(scenarioId) {
-      currentScenario = SCENARIOS.find(s => s.id === scenarioId) || SCENARIOS[0];
-
-      // Update button styles
-      SCENARIOS.forEach(s => {
-        const btn = document.getElementById(`btn-scen-${s.id}`);
-        if (btn) {
-          if (s.id === scenarioId) {
-            btn.className = "px-3 py-1.5 rounded-xl text-xs font-semibold border transition bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/30";
-          } else {
-            btn.className = "px-3 py-1.5 rounded-xl text-xs font-semibold border transition bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800";
-          }
-        }
-      });
-
-      computeKPIsAndAnalytics();
-      renderTendersTable();
-      renderRumorFeed();
-      renderBulletins();
-      renderCharts();
-      generateRtiDraft();
-      updateCounterCard();
-      lucide.createIcons();
-    }
-
-    // ==========================================
-    // DETERMINISTIC ANALYTICAL CALCULATIONS
-    // ==========================================
-    function computeKPIsAndAnalytics() {
-      const tenders = currentScenario.tenders;
-      const anomalies = tenders.filter(t => t.zScore > 2.0 || t.flag.includes('Contract Splitting'));
-      const priceOutliers = tenders.filter(t => t.zScore > 2.0);
-      const splitBids = tenders.filter(t => t.flag.includes('Contract Splitting'));
-
-      // Tenders KPIs
-      document.getElementById('kpiTendersAudited').textContent = tenders.length;
-      document.getElementById('kpiTotalSpend').textContent = currentScenario.totalBudget;
-      document.getElementById('badgeProcCount').textContent = anomalies.length;
-
-      document.getElementById('kpiFlaggedAnomalies').textContent = anomalies.length;
-      document.getElementById('kpiAnomalyBreakdown').textContent = `${priceOutliers.length} Price Outliers | ${splitBids.length} Split Bids`;
-      document.getElementById('kpiRiskLevel').textContent = anomalies.length >= 2 ? 'High Risk' : (anomalies.length === 1 ? 'Moderate' : 'Low');
-
-      // Rumor KPIs
-      const rumors = currentScenario.rumors;
-      document.getElementById('badgeRumorCount').textContent = rumors.length;
-
-      // Weighted Panic-Index calculation: Avg(Reach * (1 - Sim)) normalized
-      let totalWeightedPanic = 0;
-      let totalReach = 0;
-      let verifiedMatches = 0;
-
-      rumors.forEach(r => {
-        const sim = r.matches[0]?.sim || 0.2;
-        const panic = r.panicScore * (1 - sim * 0.5);
-        totalWeightedPanic += panic * r.reach;
-        totalReach += r.reach;
-        if (sim >= 0.4) verifiedMatches++;
-      });
-
-      const avgPanic = totalReach > 0 ? (totalWeightedPanic / totalReach).toFixed(1) : '45.0';
-      document.getElementById('kpiPanicIndex').textContent = avgPanic;
-
-      // Trust Index (% of rumors debunked or verified)
-      const trustRatio = Math.round((currentScenario.bulletins.length / (rumors.length + 2)) * 100);
-      document.getElementById('kpiTrustIndex').textContent = `${Math.min(95, Math.max(65, trustRatio))}%`;
-      document.getElementById('kpiVerifiedCount').textContent = `${currentScenario.bulletins.length} Bulletins Matched`;
-
-      // Shell vendor check
-      const vendorCounts = {};
-      tenders.forEach(t => { vendorCounts[t.vendor] = (vendorCounts[t.vendor] || 0) + 1; });
-      const topVendor = Object.entries(vendorCounts).sort((a,b) => b[1] - a[1])[0];
-      if (topVendor && topVendor[1] > 1) {
-        document.getElementById('vendorRiskText').innerHTML = `<strong>${topVendor[0]}</strong> holds ${topVendor[1]} awarded tenders in 30 days. High probability of contract partitioning to avoid oversight.`;
-      } else {
-        document.getElementById('vendorRiskText').textContent = 'Vendor contract allocation is normally dispersed.';
-      }
-    }
-
-    // ==========================================
-    // UI RENDERING: TABLES & CARDS
-    // ==========================================
-    function renderTendersTable() {
-      const tbody = document.getElementById('tenderTableBody');
-      const tenders = currentScenario.tenders.filter(t => {
-        if (tenderFilter === 'anomaly') {
-          return t.zScore > 2.0 || t.flag.includes('Contract Splitting');
-        }
-        return true;
-      });
-
-      tbody.innerHTML = tenders.map(t => {
-        const isAnomaly = t.zScore > 2.0 || t.flag.includes('Contract Splitting');
-        const badgeColor = t.zScore > 2.0 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : (t.flag.includes('Contract Splitting') ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30');
-
-        return `
-          <tr class="hover:bg-slate-800/50 transition cursor-pointer" onclick="selectTenderForRti('${t.id}')">
-            <td class="py-3 px-4 font-mono font-medium text-slate-200">${t.id}</td>
-            <td class="py-3 px-4">
-              <div class="font-semibold text-slate-100">${t.item}</div>
-              <div class="text-[11px] text-slate-400">${t.dept}</div>
-            </td>
-            <td class="py-3 px-4 font-medium text-slate-300">${t.vendor}</td>
-            <td class="py-3 px-4 font-mono font-semibold text-slate-100">₹ ${(t.amount / 100000).toFixed(1)} L</td>
-            <td class="py-3 px-4 font-mono text-slate-400">₹ ${(t.benchmark / 100000).toFixed(1)} L</td>
-            <td class="py-3 px-4 font-mono ${t.zScore > 2.0 ? 'text-rose-400 font-bold' : 'text-slate-300'}">
-              +${t.zScore.toFixed(2)} &sigma;
-            </td>
-            <td class="py-3 px-4">
-              <span class="px-2 py-0.5 text-[10px] font-semibold rounded-md ${badgeColor}">
-                ${t.flag}
-              </span>
-            </td>
-            <td class="py-3 px-4 text-right">
-              <button onclick="event.stopPropagation(); triggerSingleRtiModal('${t.id}')" class="px-2.5 py-1 text-[11px] font-medium rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 border border-blue-500/30 transition">
-                Draft RTI &rarr;
-              </button>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    function filterTenders(filter) {
-      tenderFilter = filter;
-      document.getElementById('btnFilterAll').className = filter === 'all' ? "px-2.5 py-1 rounded text-xs bg-blue-600 text-white font-medium" : "px-2.5 py-1 rounded text-xs bg-slate-800 text-slate-300 hover:bg-slate-700";
-      document.getElementById('btnFilterAnomalies').className = filter === 'anomaly' ? "px-2.5 py-1 rounded text-xs bg-rose-600 text-white font-medium" : "px-2.5 py-1 rounded text-xs bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600/30 font-medium";
-      renderTendersTable();
-    }
-
-    function renderRumorFeed() {
-      const container = document.getElementById('rumorsList');
-      const rumors = currentScenario.rumors;
-
-      container.innerHTML = rumors.map(r => {
-        const topMatch = r.matches[0];
-        const isDebunked = topMatch && topMatch.sim < 0.4;
-
-        return `
-          <div class="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl space-y-2 hover:border-slate-700 transition">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-2">
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-mono">${r.id}</span>
-                <span class="text-xs text-slate-400">${r.platform} &middot; Est. Reach: ${r.reach.toLocaleString()} citizens</span>
-              </div>
-              <div class="flex items-center space-x-1.5">
-                <span class="text-[10px] text-amber-400 font-semibold">Panic Index: ${r.panicScore}/100</span>
-              </div>
-            </div>
-
-            <p class="text-xs text-slate-200 font-medium leading-relaxed">&ldquo;${r.text}&rdquo;</p>
-
-            <!-- Semantic match result -->
-            <div class="p-2.5 bg-slate-950 rounded-lg border border-slate-800/80 text-[11px] flex items-start justify-between gap-3">
-              <div class="space-y-1">
-                <div class="flex items-center space-x-1.5">
-                  <span class="font-semibold text-slate-400">Closest Ground Truth:</span>
-                  <span class="text-blue-400">${topMatch.source}</span>
-                </div>
-                <p class="text-slate-300 italic">&ldquo;${topMatch.bulletin}&rdquo;</p>
-              </div>
-              <div class="text-right shrink-0">
-                <div class="text-[10px] text-slate-400">Cosine Match</div>
-                <div class="font-mono font-bold ${topMatch.sim < 0.35 ? 'text-rose-400' : 'text-emerald-400'}">${topMatch.sim.toFixed(2)} / 1.00</div>
-                <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${topMatch.sim < 0.35 ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}">
-                  ${topMatch.sim < 0.35 ? 'UNVERIFIED RUMOR' : 'MATCHES OFFICIAL'}
-                </span>
-              </div>
-            </div>
-
-            <div class="flex justify-end space-x-2 pt-1">
-              <button onclick="loadCounterCardDetail('${r.id}')" class="px-2.5 py-1 text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg flex items-center space-x-1">
-                <i data-lucide="megaphone" class="w-3 h-3"></i>
-                <span>Load in Counter-Card Studio &rarr;</span>
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function renderBulletins() {
-      const container = document.getElementById('bulletinList');
-      container.innerHTML = currentScenario.bulletins.map((b, idx) => `
-        <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800/80 hover:border-slate-700 transition">
-          <div class="flex items-center space-x-1.5 text-[10px] text-emerald-400 font-semibold mb-0.5">
-            <i data-lucide="shield-check" class="w-3 h-3"></i>
-            <span>Verified Ground Truth #${idx+1}</span>
-          </div>
-          <p class="text-slate-300 leading-snug">${b}</p>
-        </div>
-      `).join('');
-    }
-
-    // ==========================================
-    // CHARTS (Chart.js)
-    // ==========================================
-    function renderCharts() {
-      // 1. Procurement Unit Price Deviation Chart
-      const procCtx = document.getElementById('procurementChart').getContext('2d');
-      if (procChartInstance) procChartInstance.destroy();
-
-      const tenders = currentScenario.tenders;
-      const labels = tenders.map(t => t.id.replace('TND-2024-', '#'));
-      const unitPrices = tenders.map(t => t.unitPrice / 1000);
-      const benchPrices = tenders.map(t => t.benchUnit / 1000);
-      const backgroundColors = tenders.map(t => t.zScore > 2.0 ? 'rgba(239, 68, 68, 0.85)' : (t.flag.includes('Contract Splitting') ? 'rgba(245, 158, 11, 0.85)' : 'rgba(59, 130, 246, 0.85)'));
-
-      procChartInstance = new Chart(procCtx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: 'Actual Unit Price (₹ Thousands)',
-              data: unitPrices,
-              backgroundColor: backgroundColors,
-              borderRadius: 6
-            },
-            {
-              label: 'Benchmark Category Median (₹ Thousands)',
-              data: benchPrices,
-              backgroundColor: 'rgba(148, 163, 184, 0.4)',
-              borderRadius: 6
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { labels: { color: '#cbd5e1', font: { size: 10 } } },
-            tooltip: {
-              callbacks: {
-                afterBody: function(context) {
-                  const idx = context[0].dataIndex;
-                  return `Z-Score: +${tenders[idx].zScore.toFixed(2)}σ\nFlag: ${tenders[idx].flag}`;
-                }
-              }
-            }
-          },
-          scales: {
-            x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(51, 65, 85, 0.3)' } },
-            y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(51, 65, 85, 0.3)' } }
-          }
-        }
-      });
-
-      // 2. Vendor Doughnut Chart
-      const vendorCtx = document.getElementById('vendorDoughnutChart').getContext('2d');
-      if (vendorChartInstance) vendorChartInstance.destroy();
-
-      const vendorCounts = {};
-      tenders.forEach(t => { vendorCounts[t.vendor] = (vendorCounts[t.vendor] || 0) + (t.amount / 100000); });
-
-      vendorChartInstance = new Chart(vendorCtx, {
-        type: 'doughnut',
-        data: {
-          labels: Object.keys(vendorCounts),
-          datasets: [{
-            data: Object.values(vendorCounts),
-            backgroundColor: [
-              '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'
-            ],
-            borderWidth: 1,
-            borderColor: '#0f172a'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: { color: '#cbd5e1', boxWidth: 10, font: { size: 9 } }
-            }
-          }
-        }
-      });
-    }
-
-    // ==========================================
-    // ACTION PACKET: RTI DRAFT & COUNTER-CARD
-    // ==========================================
-    function generateRtiDraft(selectedId = null) {
-      const anomalies = currentScenario.tenders.filter(t => t.zScore > 2.0 || t.flag.includes('Contract Splitting'));
-      const activeAnomalies = selectedId ? currentScenario.tenders.filter(t => t.id === selectedId) : anomalies;
-
-      let citationRows = activeAnomalies.map((a, i) => `
-[Item #${i+1}] Tender Reference: ${a.id}
-  - Subject: Procurement of ${a.item} (${a.dept})
-  - Awardee Vendor: ${a.vendor}
-  - Contract Value: ₹ ${a.amount.toLocaleString()} (Unit Price: ₹ ${a.unitPrice.toLocaleString()})
-  - Certified Market Benchmark: ₹ ${a.benchmark.toLocaleString()} (Benchmark Unit: ₹ ${a.benchUnit.toLocaleString()})
-  - Variance Statistical Z-Score: +${a.zScore.toFixed(2)} Sigma (Markup: ${Math.round(((a.unitPrice - a.benchUnit)/a.benchUnit)*100)}%)
-  - Irregularity Flag: ${a.flag}
-      `).join('\n');
-
-      const rtiText = `FORM 'A'
-UNDER SECTION 6(1) OF THE RIGHT TO INFORMATION ACT, 2005
-
-To:
-The Public Information Officer (PIO) & Vigilance Officer
-${currentScenario.city}
-Government of National Capital Territory / State Administration
-
-Sub: Urgent Information Requisition regarding Severe Pricing Irregularities and Potential Contract Splitting in Municipal Tender Allocations
-
-Respected Authority,
-
-Under the provisions of Section 6(1) of the Right to Information Act, 2005, I, a concerned citizen and public audit monitor, request certified copies and detailed official justifications for the following high-value public procurement allocations flagged by the CivicTrust Hub Forensic Audit Engine:
-
-PARTICULARS OF INFORMATION SOUGHT:
-${citationRows}
-
-SPECIFIC INQUIRY POINTS REQUIRING ATTESTED DOCUMENTATION:
-1. Certified copies of the Detailed Project Report (DPR) and Price Reasonableness Certificate prepared prior to sanctioning the above unit rates.
-2. The complete minutes of the Tender Evaluation Committee (TEC) meetings justifying the selection of the awarded vendor over competing bids.
-3. Clarification under Rule 157 of General Financial Rules (GFR) regarding whether contracts awarded to ${activeAnomalies[0]?.vendor || 'the awardee'} were subdivided to bypass e-procurement thresholds and statutory oversight.
-4. Name, designation, and official contact details of the Competent Sanctioning Authority who approved these purchase orders.
-
-As the matter pertains to public funds and potential misuse of state exchequer during critical infrastructure deployment, kindly provide the requested information within 30 days as mandated under Section 7(1) of the Act.
-
-I am an Indian Citizen and state that the required application fee has been enclosed herewith.
-
-Yours Faithfully,
-CIVICTRUST CITIZEN AUDIT ALLIANCE
-Verification Hash: CTH-${Date.now().toString(36).toUpperCase()}-RTI`;
-
-      document.getElementById('rtiPreview').textContent = rtiText;
-    }
-
-    function selectTenderForRti(id) {
-      switchTab('action');
-      generateRtiDraft(id);
-    }
-
-    function triggerSingleRtiModal(id) {
-      selectTenderForRti(id);
-    }
-
-    function updateCounterCard(rumorId = null) {
-      const rumors = currentScenario.rumors;
-      const rumor = rumorId ? rumors.find(r => r.id === rumorId) : rumors[0];
-      if (!rumor) return;
-
-      document.getElementById('cardTimestamp').textContent = `${rumor.platform} &middot; Reach: ${rumor.reach.toLocaleString()}`;
-      document.getElementById('cardRumorText').textContent = `"${rumor.text}"`;
-      document.getElementById('cardTruthEn').textContent = rumor.counterEn;
-      document.getElementById('cardTruthHi').textContent = rumor.counterHi;
-    }
-
-    function loadCounterCardDetail(rumorId) {
-      switchTab('action');
-      updateCounterCard(rumorId);
-    }
-
-    // ==========================================
-    // SEMANTIC TESTING ENGINE (FALLBACK & LIVE)
-    // ==========================================
-    async function testCustomRumor() {
-      const input = document.getElementById('customRumorInput').value.trim();
-      if (!input) {
-        alert('Please enter a rumor or social post text to evaluate.');
-        return;
-      }
-
-      let newRumor;
-
-      // Try Backend verification first if available
-      if (isBackendConnected) {
-        try {
-          const res = await fetch(`${BACKEND_URL}/api/rumors/verify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: input, platform: 'Live API Feed' })
-          });
-          if (res.ok) {
-            const apiData = await res.json();
-            const isUnverified = apiData.classification.includes("UNVERIFIED");
-            newRumor = {
-              id: `RUMOR-API-${Date.now().toString().slice(-3)}`,
-              text: input,
-              platform: 'FastAPI Backend Feed',
-              reach: 18500,
-              panicScore: apiData.panic_index,
-              keywords: ['api-verified', 'semantic-match'],
-              matches: [{ source: apiData.ground_truth.source, bulletin: apiData.ground_truth.text, sim: apiData.cosine_similarity }],
-              counterEn: apiData.counter_en,
-              counterHi: apiData.counter_hi
-            };
-          }
-        } catch (e) {
-          console.warn("Backend error, falling back to local model", e);
-        }
-      }
-
-      // Offline fallback calculation
-      if (!newRumor) {
-        const words = input.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ');
-        let bestMatch = currentScenario.bulletins[0];
-        let maxScore = 0.15;
-
-        currentScenario.bulletins.forEach(bulletin => {
-          const bWords = bulletin.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ');
-          let matches = 0;
-          words.forEach(w => { if (w.length > 3 && bWords.includes(w)) matches++; });
-          const score = matches / Math.max(words.length, 5);
-          if (score > maxScore) {
-            maxScore = score;
-            bestMatch = bulletin;
-          }
-        });
-
-        const cosineSim = Math.min(0.92, Math.max(0.12, maxScore * 1.8));
-        const isUnverified = cosineSim < 0.40;
-
-        newRumor = {
-          id: `RUMOR-USR-${Date.now().toString().slice(-3)}`,
-          text: input,
-          platform: 'User Input Signal',
-          reach: 12500,
-          panicScore: isUnverified ? 82 : 35,
-          keywords: words.slice(0, 3),
-          matches: [{ source: 'Real-Time Bulletin Engine', bulletin: bestMatch, sim: cosineSim }],
-          counterEn: isUnverified ? `FACT CHECK: Social claim "${input}" contradicts official bulletin: "${bestMatch}". Official authorities confirm normalcy.` : `VERIFIED: Information aligns with official release: "${bestMatch}".`,
-          counterHi: isUnverified ? `खंडन: यह दावा आधिकारिक बुलेटिन से मेल नहीं खाता है। स्थिति सामान्य और नियंत्रित है।` : `सत्यापित: यह सूचना आधिकारिक सरकारी पुष्टि के अनुरूप है।`
-        };
-      }
-
-      currentScenario.rumors.unshift(newRumor);
-      computeKPIsAndAnalytics();
-      renderRumorFeed();
-      updateCounterCard(newRumor.id);
-      document.getElementById('customRumorInput').value = '';
-      alert(`Analyzed! Origin: ${isBackendConnected ? 'FastAPI Backend (:8000)' : 'Deterministic Local Engine'}\nMatch similarity: ${newRumor.matches[0].sim.toFixed(2)} -> ${newRumor.matches[0].sim < 0.40 ? 'FLAGGED AS UNVERIFIED RUMOR' : 'VERIFIED OFFICIAL MATCH'}`);
-    }
-
-    // ==========================================
-    // TAB NAVIGATION
-    // ==========================================
-    function switchTab(tab) {
-      document.getElementById('tabProcurement').classList.add('hidden');
-      document.getElementById('tabRumor').classList.add('hidden');
-      document.getElementById('tabAction').classList.add('hidden');
-
-      const pBtn = document.getElementById('tabProcurementBtn');
-      const rBtn = document.getElementById('tabRumorBtn');
-      const aBtn = document.getElementById('tabActionBtn');
-
-      pBtn.className = "pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2";
-      rBtn.className = "pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2";
-      aBtn.className = "pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2";
-
-      if (tab === 'procurement') {
-        document.getElementById('tabProcurement').classList.remove('hidden');
-        pBtn.className = "pb-3 border-b-2 border-blue-500 text-blue-400 flex items-center space-x-2";
-      } else if (tab === 'rumor') {
-        document.getElementById('tabRumor').classList.remove('hidden');
-        rBtn.className = "pb-3 border-b-2 border-amber-500 text-amber-400 flex items-center space-x-2";
-      } else {
-        document.getElementById('tabAction').classList.remove('hidden');
-        aBtn.className = "pb-3 border-b-2 border-emerald-500 text-emerald-400 flex items-center space-x-2";
-      }
-      lucide.createIcons();
-    }
-
-    // ==========================================
-    // EXPORT & DOWNLOAD PACKET
-    // ==========================================
-    function downloadActionPacket() {
-      const rtiContent = document.getElementById('rtiPreview').textContent;
-      const counterCardEn = document.getElementById('cardTruthEn').textContent;
-      const counterCardHi = document.getElementById('cardTruthHi').textContent;
-      const rumorClaim = document.getElementById('cardRumorText').textContent;
-
-      const fullPacket = `=================================================================
-CIVICTRUST HUB: OFFICIAL STATUTORY AUDIT & CITIZEN ACTION PACKET
-Generated: ${new Date().toISOString()} | Target: ${currentScenario.city}
-=================================================================
-
-SECTION I: LEGAL RTI DRAFT NOTICE (READY FOR SUBMISSION)
------------------------------------------------------------------
-${rtiContent}
-
-=================================================================
-SECTION II: CITIZEN CRISIS COUNTER-CARD (FACT-CHECK BROADCAST)
------------------------------------------------------------------
-CLAIM AUDITED:
-${rumorClaim}
-
-VERIFIED COUNTER-NARRATIVE (ENGLISH):
-${counterCardEn}
-
-VERIFIED COUNTER-NARRATIVE (HINDI/REGIONAL):
-${counterCardHi}
-
-HASHTAGS: #CivicTrust #FactCheck #PublicTransparency #StopMisinformation
-=================================================================
-Generated by CivicTrust Hub Hybrid Deterministic AI Engine.
-`;
-
-      const blob = new Blob([fullPacket], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `CivicTrust_Action_Packet_${currentScenario.id}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }
-
-    function copyToClipboard(elementId, successMsg) {
-      const el = document.getElementById(elementId);
-      const text = el.tagName === 'PRE' ? el.textContent : el.innerText;
-      navigator.clipboard.writeText(text).then(() => {
-        alert(successMsg || 'Copied to clipboard!');
-      });
-    }
-
-    function togglePitchDetails() {
-      const el = document.getElementById('pitchDetails');
-      const text = document.getElementById('pitchToggleText');
-      if (el.classList.contains('hidden')) {
-        el.classList.remove('hidden');
-        text.textContent = 'Hide Submission Details';
-      } else {
-        el.classList.add('hidden');
-        text.textContent = 'Show Submission Details';
-      }
-    }
-
-    // ==========================================
-    // API KEY MANAGEMENT
-    // ==========================================
-    function openApiModal() {
-      document.getElementById('apiModal').classList.remove('hidden');
-      document.getElementById('apiKeyInput').value = userApiKey;
-      document.getElementById('apiProvider').value = userApiProvider;
-    }
-
-    function closeApiModal() {
-      document.getElementById('apiModal').classList.add('hidden');
-    }
-
-    function saveApiKey() {
-      userApiKey = document.getElementById('apiKeyInput').value.trim();
-      userApiProvider = document.getElementById('apiProvider').value;
-      localStorage.setItem('civictrust_apikey', userApiKey);
-      localStorage.setItem('civictrust_provider', userApiProvider);
-      updateApiKeyUI();
-      closeApiModal();
-      alert(userApiKey ? 'API Key Saved! LLM Hybrid mode enabled.' : 'Using Deterministic Offline Engine.');
-    }
-
-    function updateApiKeyUI() {
-      const statusBadge = document.getElementById('engineStatusBadge');
-      const keyStatusText = document.getElementById('apiKeyStatusText');
-      if (userApiKey) {
-        statusBadge.textContent = `Hybrid Mode: ${userApiProvider.toUpperCase()} Connected`;
-        keyStatusText.textContent = 'AI Key: Active';
-      } else {
-        statusBadge.textContent = 'Hybrid Engine: Offline Deterministic (Zero Latency)';
-        keyStatusText.textContent = 'AI Key (Optional)';
-      }
+        resultBox.classList.remove('hidden');
+      }, 1500);
     }
   </script>
+
 </body>
 </html>
