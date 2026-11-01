@@ -167,10 +167,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve the front-end static files
-FRONTEND_DIR = pathlib.Path(__file__).parent / "frontend"
-if FRONTEND_DIR.is_dir():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+# Serve static assets from project root (css, js, images etc. if any)
+ROOT_DIR = pathlib.Path(__file__).parent
+app.mount("/static", StaticFiles(directory=str(ROOT_DIR)), name="static")
 
 
 # ----------------------------------------------------------------
@@ -213,12 +212,12 @@ def get_officials():
 
 @app.get("/")
 def serve_index():
-    """Serve the front-end index.html when visiting http://localhost:8000"""
-    index_path = FRONTEND_DIR / "index.html"
+    """Serve the front-end index.html from the project root."""
+    index_path = pathlib.Path(__file__).parent / "index.html"
     if index_path.exists():
         return FileResponse(str(index_path), media_type="text/html")
     return JSONResponse(
-        {"message": "CivicTrust Hub API is running. Frontend not found at /frontend/index.html"},
+        {"message": "CivicTrust Hub API is running. index.html not found in project root."},
         status_code=404,
     )
 
