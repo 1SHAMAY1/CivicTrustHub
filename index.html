@@ -160,6 +160,24 @@
       submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
 
       try {
+        const cleanRaw = input.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
+        const rawWords = cleanRaw.split(/\s+/).filter(Boolean);
+
+        // Edge case detection: greetings, single characters, numbers only, or queries too short/irrelevant
+        const commonGreetings = ['hi', 'hello', 'hey', 'test', 'testing', 'how are you', 'who are you', 'good morning', 'good afternoon', 'good evening', 'bye', 'ok', 'okay', 'yes', 'no'];
+        const isTooShort = rawWords.length < 2 || cleanRaw.length < 5;
+        const isGreeting = commonGreetings.includes(cleanRaw);
+        const isNumbersOnly = /^\d+$/.test(cleanRaw);
+
+        if (isGreeting || isTooShort || isNumbersOnly) {
+          verdictText.textContent = "Please check rumors only.";
+          verdictText.className = "text-xl sm:text-2xl font-bold text-amber-600 tracking-normal py-2";
+          confidenceBadge.textContent = "Invalid Query";
+          confidenceBadge.className = "text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200";
+          resultBox.classList.remove('hidden');
+          return;
+        }
+
         let isTrue = false;
         let confidenceScore = 0.85;
         let evidenceSnippet = '';
